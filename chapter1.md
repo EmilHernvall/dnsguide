@@ -1,5 +1,5 @@
-1. The DNS protocol
--------------------
+1 - The DNS protocol
+====================
 
 We'll start out by investigating the DNS protocol and use our knowledge thereof
 to implement a simple client.

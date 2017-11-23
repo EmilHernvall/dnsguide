@@ -1,5 +1,5 @@
-4. Baby's first DNS server
---------------------------
+4 - Baby's first DNS server
+===========================
 
 Haven gotten this far, we're ready to make our first attempt at writing an
 actual server. In reality, DNS servers fullfil two different purposes:

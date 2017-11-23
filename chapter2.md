@@ -1,5 +1,5 @@
-2. Building a stub resolver
----------------------------
+2 - Building a stub resolver
+============================
 
 While it's slightly satisfying to know that we're able to succesfully parse DNS
 packets, it's not much use to just read them off disk. As our next step, we'll

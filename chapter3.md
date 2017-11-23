@@ -1,5 +1,5 @@
-3. Adding more Record Types
----------------------------
+3 - Adding more Record Types
+============================
 
 Let's use our program to do a lookup for ''yahoo.com''.
 
