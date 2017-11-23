@@ -1,5 +1,5 @@
-Building a stub resolver
-------------------------
+2. Building a stub resolver
+---------------------------
 
 While it's slightly satisfying to know that we're able to succesfully parse DNS
 packets, it's not much use to just read them off disk. As our next step, we'll
@@ -15,61 +15,49 @@ packets, but also write them. To do so, we'll need to extend `BytePacketBuffer`
 with some additional methods:
 
 ```rust
-extern crate dnsguide;
-use dnsguide::chapter2::*;
-```
+impl BytePacketBuffer {
 
-```rust
-trait WriteableBuffer {
-    fn write(&mut self, val: u8) -> Result<usize>;
-    fn write_u8(&mut self, val: u8) -> Result<usize>;
-    fn write_u16(&mut self, val: u16) -> Result<usize>;
-    fn write_u32(&mut self, val: u32) -> Result<usize>;
-    fn write_qname(&mut self, qname: &str) -> Result<usize>;
-}
+    - snip -
 
-impl WriteableBuffer for BytePacketBuffer {
-
-    fn write(&mut self, val: u8) -> Result<usize> {
+    fn write(&mut self, val: u8) -> Result<()> {
         if self.pos >= 512 {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
         self.buf[self.pos] = val;
         self.pos += 1;
-        Ok(1)
+        Ok(())
     }
 
-    fn write_u8(&mut self, val: u8) -> Result<usize> {
+    fn write_u8(&mut self, val: u8) -> Result<()> {
         try!(self.write(val));
 
-        Ok(1)
+        Ok(())
     }
 
-    fn write_u16(&mut self, val: u16) -> Result<usize> {
+    fn write_u16(&mut self, val: u16) -> Result<()> {
         try!(self.write((val >> 8) as u8));
         try!(self.write((val & 0xFF) as u8));
 
-        Ok(2)
+        Ok(())
     }
 
-    fn write_u32(&mut self, val: u32) -> Result<usize> {
+    fn write_u32(&mut self, val: u32) -> Result<()> {
         try!(self.write(((val >> 24) & 0xFF) as u8));
         try!(self.write(((val >> 16) & 0xFF) as u8));
         try!(self.write(((val >> 8) & 0xFF) as u8));
         try!(self.write(((val >> 0) & 0xFF) as u8));
 
-        Ok(4)
+        Ok(())
     }
 ```
 
 We'll also need a function for writing query names in labeled form:
 
 ```rust
-    fn write_qname(&mut self, qname: &str) -> Result<usize> {
+    fn write_qname(&mut self, qname: &str) -> Result<()> {
 
         let split_str = qname.split('.').collect::<Vec<&str>>();
 
-        let mut bytes_written = 0;
         for label in split_str {
             let len = label.len();
             if len > 0x34 {
@@ -77,18 +65,14 @@ We'll also need a function for writing query names in labeled form:
             }
 
             try!(self.write_u8(len as u8));
-            bytes_written += 1;
-
             for b in label.as_bytes() {
                 try!(self.write_u8(*b));
-                bytes_written += 1;
             }
         }
 
         try!(self.write_u8(0));
-        bytes_written += 1;
 
-        Ok(bytes_written)
+        Ok(())
     }
 
 } // End of BytePacketBuffer
@@ -100,13 +84,11 @@ Building on our new functions we can extend our protocol representation
 structs. Starting with `DnsHeader`:
 
 ```rust
-trait BufferWriteable {
-    fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize>;
-}
+impl DnsHeader {
 
-impl BufferWriteable for DnsHeader {
+    - snip -
 
-    fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
         try!(buffer.write_u16(self.id));
 
         try!(buffer.write_u8( ((self.recursion_desired as u8)) |
@@ -126,7 +108,7 @@ impl BufferWriteable for DnsHeader {
         try!(buffer.write_u16(self.authoritative_entries));
         try!(buffer.write_u16(self.resource_entries));
 
-        Ok(12)
+        Ok(())
     }
 
 }
@@ -137,19 +119,19 @@ impl BufferWriteable for DnsHeader {
 Moving on to `DnsQuestion`:
 
 ```rust
-impl BufferWriteable for DnsQuestion {
+impl DnsQuestion {
 
-    fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
+    - snip -
 
-        let mut bytes_written = 0;
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
 
-        bytes_written += try!(buffer.write_qname(&self.name));
+        try!(buffer.write_qname(&self.name));
 
         let typenum = self.qtype.to_num();
-        bytes_written += try!(buffer.write_u16(typenum));
-        bytes_written += try!(buffer.write_u16(1));
+        try!(buffer.write_u16(typenum));
+        try!(buffer.write_u16(1));
 
-        Ok(bytes_written)
+        Ok(())
     }
 
 }
@@ -161,9 +143,11 @@ impl BufferWriteable for DnsQuestion {
 quite a bit of code here to handle different record types:
 
 ```rust
-impl BufferWriteable for DnsRecord {
+impl DnsRecord {
 
-    fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
+    - snip -
+
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
 
         let start_pos = buffer.pos();
 
@@ -194,38 +178,36 @@ impl BufferWriteable for DnsRecord {
 
 ### Extending DnsPacket for writing
 
-Based on what we've accomplished, we can amend `DnsPacket` with its own
-`write` function:
+Putting it all together in `DnsPacket`:
 
 ```rust
-impl BufferWriteable for DnsPacket {
+impl DnsPacket {
 
-    fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize>
+    - snip -
+
+    pub fn write(&mut self, buffer: &mut BytePacketBuffer) -> Result<()>
     {
-        let mut header = self.header.clone();
-        header.questions = self.questions.len() as u16;
-        header.answers = self.answers.len() as u16;
-        header.authoritative_entries = self.authorities.len() as u16;
-        header.resource_entries = self.resources.len() as u16;
+        self.header.questions = self.questions.len() as u16;
+        self.header.answers = self.answers.len() as u16;
+        self.header.authoritative_entries = self.authorities.len() as u16;
+        self.header.resource_entries = self.resources.len() as u16;
 
-        let mut bytes_written = 0;
-
-        bytes_written += try!(header.write(buffer));
+        try!(self.header.write(buffer));
 
         for question in &self.questions {
-            bytes_written += try!(question.write(buffer));
+            try!(question.write(buffer));
         }
         for rec in &self.answers {
-            bytes_written += try!(rec.write(buffer));
+            try!(rec.write(buffer));
         }
         for rec in &self.authorities {
-            bytes_written += try!(rec.write(buffer));
+            try!(rec.write(buffer));
         }
         for rec in &self.resources {
-            bytes_written += try!(rec.write(buffer));
+            try!(rec.write(buffer));
         }
 
-        Ok(bytes_written)
+        Ok(())
     }
 
 }
@@ -249,6 +231,7 @@ fn main() {
     let socket = UdpSocket::bind(("0.0.0.0", 43210)).unwrap();
 ```
 
+
 Next we'll build our query packet. It's important that we remember to set the
 `recursion_desired` flag. As noted earlier, the packet id is arbitrary.
 
@@ -264,8 +247,8 @@ Next we'll build our query packet. It's important that we remember to set the
 We can use our new write method to write the packet to a buffer...
 
 ```rust
-    let mut req_buffer = BytePacketBuffer::new();
-    packet.write(&mut req_buffer).unwrap();
+        let mut req_buffer = BytePacketBuffer::new();
+        packet.write(&mut req_buffer).unwrap();
 ```
 
 ...and send it off to the server using our socket:

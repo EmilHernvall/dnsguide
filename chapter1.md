@@ -1,5 +1,5 @@
-The DNS protocol
-----------------
+1. The DNS protocol
+-------------------
 
 We'll start out by investigating the DNS protocol and use our knowledge thereof
 to implement a simple client.
@@ -92,12 +92,12 @@ a lookup using the `dig` tool:
 
 ;; ANSWER SECTION:
 google.com.             204     IN      A       172.217.18.142
+```
 
 ;; Query time: 0 msec
 ;; SERVER: 192.168.1.1#53(192.168.1.1)
 ;; WHEN: Wed Jul 06 13:24:19 CEST 2016
 ;; MSG SIZE  rcvd: 44
-```
 
 We're using the `+noedns` flag to make sure we stick to the original format.
 There are a few things of note in the output above:
@@ -316,17 +316,9 @@ on to the record type.
 
 ### BytePacketBuffer
 
-Now finally we know enough to start implementing! Some tools are needed:
-
-```rust
-use std::io::{Result, Read};
-use std::io::{Error, ErrorKind};
-use std::net::Ipv4Addr;
-use std::fs::File;
-```
-
-The first order of business is that we need some convenient method for manipulating 
-the packets. For this, we'll use a `struct` called `BytePacketBuffer`.
+Now finally we know enough to start implementing! The first order of business is
+that we need some convenient method for manipulating the packets. For this,
+we'll use a `struct` called `BytePacketBuffer`.
 
 ```rust
 pub struct BytePacketBuffer {
@@ -490,7 +482,7 @@ Read another byte, and calculate the jump offset:
 Indicate that a jump was performed.
 
 ```rust
-                jumped = true;
+                    jumped = true;
 ```
 
 Restart the loop and retry at the new position.
@@ -800,7 +792,7 @@ impl DnsRecord {
 
 ### DnsPacket
 
-Finally, we're going to compose them in a struct called `DnsPacket`:
+Finally, let's put it all together in a struct called `DnsPacket`:
 
 ```rust
 #[derive(Clone, Debug)]
