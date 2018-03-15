@@ -92,12 +92,12 @@ a lookup using the `dig` tool:
 
 ;; ANSWER SECTION:
 google.com.             204     IN      A       172.217.18.142
-```
 
 ;; Query time: 0 msec
 ;; SERVER: 192.168.1.1#53(192.168.1.1)
 ;; WHEN: Wed Jul 06 13:24:19 CEST 2016
 ;; MSG SIZE  rcvd: 44
+```
 
 We're using the `+noedns` flag to make sure we stick to the original format.
 There are a few things of note in the output above:
@@ -328,19 +328,18 @@ pub struct BytePacketBuffer {
 
 impl BytePacketBuffer {
 
+    // This gives us a fresh buffer for holding the packet contents, and a field for
+    // keeping track of where we are.
     pub fn new() -> BytePacketBuffer {
         BytePacketBuffer {
             buf: [0; 512],
             pos: 0
         }
     }
-```
 
-This gives us a fresh buffer for holding the packet contents, and a field for
-keeping track of where we are. When handling the reading of domain names later
-on, we'll need a way of reading and manipulating our buffer position:
+    // When handling the reading of domain names, we'll need a way of
+    // reading and manipulating our buffer position.
 
-```rust
     fn pos(&self) -> usize {
         self.pos
     }
@@ -356,11 +355,8 @@ on, we'll need a way of reading and manipulating our buffer position:
 
         Ok(())
     }
-```
 
-Next up is a method for reading a single byte, and moving one step forward:
-
-```rust
+    // A method for reading a single byte, and moving one step forward
     fn read(&mut self) -> Result<u8> {
         if self.pos >= 512 {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
@@ -370,34 +366,27 @@ Next up is a method for reading a single byte, and moving one step forward:
 
         Ok(res)
     }
-```
 
-We might also want to retrieve a byte at our current position without moving
-forward:
+    // Methods for fetching data at a specified position, without modifying
+    // the internal position
 
-```rust
     fn get(&mut self, pos: usize) -> Result<u8> {
         if pos >= 512 {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
         Ok(self.buf[pos])
     }
-```
 
-Sometimes we want to get a full range of the buffer:
-
-```rust
     fn get_range(&mut self, start: usize, len: usize) -> Result<&[u8]> {
         if start + len >= 512 {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
         Ok(&self.buf[start..start+len as usize])
     }
-```
 
-In many cases we'll want to read a two-byte integer or a four-byte integer:
+    // Methods for reading a u16 and u32 from the buffer, while stepping
+    // forward 2 or 4 bytes
 
-```rust
     fn read_u16(&mut self) -> Result<u16>
     {
         let res = ((try!(self.read()) as u16) << 8) |
@@ -415,135 +404,86 @@ In many cases we'll want to read a two-byte integer or a four-byte integer:
 
         Ok(res)
     }
-```
 
-And then we get to the tricky part of correctly reading domain names, handling
-any jump we might encounter:
-
-```rust
+    // The tricky part: Reading domain names, taking labels into consideration.
+    // Will take something like [3]www[6]google[3]com[0] and append
+    // www.google.com to outstr.
     fn read_qname(&mut self, outstr: &mut String) -> Result<()>
     {
-```
-
-Since we might encounter jumps, we'll keep track of our position
-locally as opposed to using the position within the struct.
-
-```rust
+        // Since we might encounter jumps, we'll keep track of our position
+        // locally as opposed to using the position within the struct. This
+        // allows us to move the shared position to a point past our current
+        // qname, while keeping track of our progress on the current qname
+        // using this variable.
         let mut pos = self.pos();
-```
 
-We'll keep track of whether or not we've jumped for use later on
-
-```rust
+        // track whether or not we've jumped
         let mut jumped = false;
-```
 
-Our delimeter which we append for each label. Since we don't want a dot at the
-beginning of the domain name we'll leave it empty for now and set it to "." at
-the end of the first iteration.
-
-```rust
+        // Our delimeter which we append for each label. Since we don't want a dot at the
+        // beginning of the domain name we'll leave it empty for now and set it to "." at
+        // the end of the first iteration.
         let mut delim = "";
         loop {
-```
-
-We're at the beginning of a label, so our current position is the length byte.
-
-```rust
+            // At this point, we're always at the beginning of a label. Recall
+            // that labels start with a length byte.
             let len = try!(self.get(pos));
-```
 
-`len* is a two byte sequence, where the two highest bits of the first byte is
-set, represents a offset relative to the start of the buffer. We handle this
-by jumping to the offset, setting a flag to indicate that we shouldn't update
-the shared buffer position once done.
-
-```rust
+            // If len has the two most significant bit are set, it represents a jump to
+            // some other offset in the packet:
             if (len & 0xC0) > 0 {
-```
-
-When a jump is performed, we only modify the shared buffer position once, and avoid
-making the change later on.
-
-```rust
+                // Update the buffer position to a point past the current
+                // label. We don't need to touch it any further.
                 if !jumped {
                     try!(self.seek(pos+2));
                 }
-```
 
-Read another byte, and calculate the jump offset:
-
-```rust
+                // Read another byte, calculate offset and perform the jump by
+                // updating our local position variable
                 let b2 = try!(self.get(pos+1)) as u16;
                 let offset = (((len as u16) ^ 0xC0) << 8) | b2;
                 pos = offset as usize;
-```
 
-Indicate that a jump was performed.
-
-```rust
-                    jumped = true;
-```
-
-Restart the loop and retry at the new position.
-
-```rust
-                continue;
+                // Indicate that a jump was performed.
+                jumped = true;
             }
-```
 
-Move a single byte forward to move past the length byte.
+            // The base scenario, where we're reading a single label and
+            // appending it to the output:
+            else {
+                // Move a single byte forward to move past the length byte.
+                pos += 1;
 
-```rust
-            pos += 1;
-```
+                // Domain names are terminated by an empty label of length 0, so if the length is zero
+                // we're done.
+                if len == 0 {
+                    break;
+                }
 
-Domain names are terminated by an empty label of length 0, so if the length is zero
-we're done.
+                // Append the delimiter to our output buffer first.
+                outstr.push_str(delim);
 
-```rust
-            if len == 0 {
-                break;
+                // Extract the actual ASCII bytes for this label and append them to the output buffer.
+
+                let str_buffer = try!(self.get_range(pos, len as usize));
+                outstr.push_str(&String::from_utf8_lossy(str_buffer).to_lowercase());
+
+                delim = ".";
+
+                // Move forward the full length of the label.
+                pos += len as usize;
             }
-```
-
-Append the delimiter to our output buffer first.
-
-```rust
-            outstr.push_str(delim);
-```
-
-Extract the actual ASCII bytes for this label and append them to the output buffer.
-
-```rust
-            let str_buffer = try!(self.get_range(pos, len as usize));
-            outstr.push_str(&String::from_utf8_lossy(str_buffer).to_lowercase());
-
-            delim = ".";
-```
-
-Move forward the full length of the label.
-
-```rust
-            pos += len as usize;
         }
-```
 
-If a jump has been performed, we've already modified the buffer position state and
-shouldn't do so again.
-
-```rust
+        // If a jump has been performed, we've already modified the buffer position state and
+        // shouldn't do so again.
         if !jumped {
             try!(self.seek(pos));
         }
 
         Ok(())
     } // End of read_qname
-```
 
-Oh, and we're done:
-
-```rust
 } // End of BytePacketBuffer
 ```
 
