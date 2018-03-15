@@ -2,7 +2,7 @@
 ===========================
 
 Haven gotten this far, we're ready to make our first attempt at writing an
-actual server. In reality, DNS servers fullfil two different purposes:
+actual server. Real DNS servers come in two different varieties:
 
  * Authoritative Server - A DNS server hosting one or more "zones". For
    instance, the authoritative servers for the zone google.com are
@@ -15,7 +15,7 @@ actual server. In reality, DNS servers fullfil two different purposes:
    8.8.8.8 and 8.8.4.4.
 
 Strictly speaking, there's nothing to stop a server from doing both things, but
-in pracice these two roles are typically mutually exclusive. This also explains
+in practice these two roles are typically mutually exclusive. This also explains
 the significance of the flags `RD` (Recursion Desired) and `RA` (Recursion
 Available) in the packet header -- a stub resolver querying a caching server
 will set the `RD` flag, and since the server allows such queries it will
@@ -77,7 +77,7 @@ servers hosting the *google.com* zone:
 ```
 
 Notice how the status of the response says `REFUSED`! `dig` also warns us that
-while the `RD` flag was set in the query, the server didn't set it in the
+while the `RD` flag was set in the query, the server didn't set the `RA` flag in the
 response. We can still use the same server for *google.com*, however:
 
 ```text
@@ -177,19 +177,13 @@ fn main() {
 
     // Bind an UDP socket on port 2053
     let socket = UdpSocket::bind(("0.0.0.0", 2053)).unwrap();
-```
 
-For now, queries are handled sequentially, so an infinite loop for servicing
-requests is initiated.
-
-```rust
+    // For now, queries are handled sequentially, so an infinite loop for servicing
+    // requests is initiated.
     loop {
-```
 
-With a socket ready, we can go ahead and read a packet. This will block until
-one is received.
-
-```rust
+        // With a socket ready, we can go ahead and read a packet. This will 
+        // block until one is received.
         let mut req_buffer = BytePacketBuffer::new();
         let (_, src) = match socket.recv_from(&mut req_buffer.buf) {
             Ok(x) => x,
@@ -198,19 +192,17 @@ one is received.
                 continue;
             }
         };
-```
 
-Here we use match to safely unwrap the `Result`. If everything's as expected,
-the raw bytes are simply returned, and if not it'll abort by restarting the
-loop and waiting for the next request. The `recv_from` function will write the
-data into the provided buffer, and return the length of the data read as well
-as the source adress. We're not interested in the length, but we need to keep
-track of the source in order to send our reply later on.
+        // Here we use match to safely unwrap the `Result`. If everything's as expected,
+        // the raw bytes are simply returned, and if not it'll abort by restarting the
+        // loop and waiting for the next request. The `recv_from` function will write the
+        // data into the provided buffer, and return the length of the data read as well
+        // as the source adress. We're not interested in the length, but we need to keep
+        // track of the source in order to send our reply later on.
 
-Next, `DnsPacket::from_buffer` is used to parse the raw bytes into
-a `DnsPacket`. It uses the same error handling idiom as the previous statement.
+        // Next, `DnsPacket::from_buffer` is used to parse the raw bytes into
+        // a `DnsPacket`. It uses the same error handling idiom as the previous statement.
 
-```rust
         let request = match DnsPacket::from_buffer(&mut req_buffer) {
             Ok(x) => x,
             Err(e) => {
@@ -218,43 +210,31 @@ a `DnsPacket`. It uses the same error handling idiom as the previous statement.
                 continue;
             }
         };
-```
 
-At this stage, the response packet is created and initiated.
-
-```rust
+        // Create and initialize the response packet
         let mut packet = DnsPacket::new();
         packet.header.id = request.header.id;
         packet.header.recursion_desired = true;
         packet.header.recursion_available = true;
         packet.header.response = true;
-```
 
-Being mindful of how unreliable input data from arbitrary senders can be, we
-need make sure that a question is actually present. If not, we return `FORMERR`
-to indicate that the sender made something wrong.
-
-```rust
+        // Being mindful of how unreliable input data from arbitrary senders can be, we
+        // need make sure that a question is actually present. If not, we return `FORMERR`
+        // to indicate that the sender made something wrong.
         if request.questions.is_empty() {
             packet.header.rescode = ResultCode::FORMERR;
         }
-```
 
-Usually a question will be present, though.
-
-```rust
+        // Usually a question will be present, though.
         else {
             let question = &request.questions[0];
             println!("Received query: {:?}", question);
-```
 
-Since all is set up and as expected, the query can be forwarded to the target
-server. There's always the possibility that the query will fail, in which case
-the `SERVFAIL` response code is set to indicate as much to the client. If
-rather everything goes as planned, the question and response records as copied
-into our response packet.
-
-```rust
+            // Since all is set up and as expected, the query can be forwarded to the target
+            // server. There's always the possibility that the query will fail, in which case
+            // the `SERVFAIL` response code is set to indicate as much to the client. If
+            // rather everything goes as planned, the question and response records as copied
+            // into our response packet.
             if let Ok(result) = lookup(&question.name, question.qtype, server) {
                 packet.questions.push(question.clone());
                 packet.header.rescode = result.header.rescode;
@@ -274,47 +254,43 @@ into our response packet.
             } else {
                 packet.header.rescode = ResultCode::SERVFAIL;
             }
-```
 
-The only thing remaining is to encode our response and send it off!
+            // The only thing remaining is to encode our response and send it off!
 
-```rust
-        let mut res_buffer = BytePacketBuffer::new();
-        match packet.write(&mut res_buffer) {
-            Ok(_) => {},
-            Err(e) => {
-                println!("Failed to encode UDP response packet: {:?}", e);
-                continue;
-            }
-        };
+            let mut res_buffer = BytePacketBuffer::new();
+            match packet.write(&mut res_buffer) {
+                Ok(_) => {},
+                Err(e) => {
+                    println!("Failed to encode UDP response packet: {:?}", e);
+                    continue;
+                }
+            };
 
-        let len = res_buffer.pos();
-        let data = match res_buffer.get_range(0, len) {
-            Ok(x) => x,
-            Err(e) => {
-                println!("Failed to retrieve response buffer: {:?}", e);
-                continue;
-            }
-        };
+            let len = res_buffer.pos();
+            let data = match res_buffer.get_range(0, len) {
+                Ok(x) => x,
+                Err(e) => {
+                    println!("Failed to retrieve response buffer: {:?}", e);
+                    continue;
+                }
+            };
 
-        match socket.send_to(data, src) {
-            Ok(_) => {},
-            Err(e) => {
-                println!("Failed to send response buffer: {:?}", e);
-                continue;
-            }
-        };
-```
-
-The match idiom for error handling is used again here, since we want to avoid
-terminating our request loop at all cost. It's a bit verbose, and normally we'd
-like to use `try!` instead. Unfortunately that's unavailable to us here, since
-we're in the `main` function which doesn't return a `Result`.
-
-```rust
+            match socket.send_to(data, src) {
+                Ok(_) => {},
+                Err(e) => {
+                    println!("Failed to send response buffer: {:?}", e);
+                    continue;
+                }
+            };
+        }
     } // End of request loop
 } // End of main
 ```
+
+The match idiom for error handling is used again and again here, since we want to avoid
+terminating our request loop at all cost. It's a bit verbose, and normally we'd
+like to use `try!` instead. Unfortunately that's unavailable to us here, since
+we're in the `main` function which doesn't return a `Result`.
 
 All done! Let's try it! We start our server in one terminal, and use `dig` to
 perform a lookup in a second terminal.
@@ -348,5 +324,5 @@ Received query: DnsQuestion { name: "google.com", qtype: A }
 Answer: A { domain: "google.com", addr: 216.58.211.142, ttl: 96 }
 ```
 
-In less than 800 lines of code, we've built a DNS server able to respond to
+Success! In less than 800 lines of code, we've built a DNS server able to respond to
 queries with several different record types!

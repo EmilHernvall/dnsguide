@@ -167,14 +167,10 @@ Before we can get on, we'll need a few utility functions on `DnsPacket`.
 impl DnsPacket {
 
     - snip -
-```
 
-First, it's useful to be able to pick a random A record from a packet. Since we
-don't want to introduce an external dependency, and there's no method for
-generating random numbers in the rust standard library, we'll just pick the
-first entry for now.
-
-```rust
+    // It's useful to be able to pick a random A record from a packet. When we
+    // get multiple IP's for a single name, it doesn't matter which one we
+    // choose, so in those cases we can now pick one at random.
     pub fn get_random_a(&self) -> Option<String> {
         if !self.answers.is_empty() {
             let idx = random::<usize>() % self.answers.len();
@@ -186,31 +182,22 @@ first entry for now.
 
         None
     }
-```
 
-Second, we'll use the fact that name servers often bundle the corresponding
-A records when replying to an NS query to implement a function that returns
-the actual IP for an NS record if possible.
-
-```rust
+    // We'll use the fact that name servers often bundle the corresponding
+    // A records when replying to an NS query to implement a function that returns
+    // the actual IP for an NS record if possible.
     pub fn get_resolved_ns(&self, qname: &str) -> Option<String> {
-```
 
-First, we scan the list of NS records in the authorities section:
-
-```rust
+        // First, we scan the list of NS records in the authorities section:
         let mut new_authorities = Vec::new();
         for auth in &self.authorities {
             if let DnsRecord::NS { ref domain, ref host, .. } = *auth {
                 if !qname.ends_with(domain) {
                     continue;
                 }
-```
 
-Once we've found an NS record, we scan the resources record for a matching
-A record...
-
-```rust
+                // Once we've found an NS record, we scan the resources record for a matching
+                // A record...
                 for rsrc in &self.resources {
                     if let DnsRecord::A{ ref domain, ref addr, ttl } = *rsrc {
                         if domain != host {
@@ -222,22 +209,15 @@ A record...
                             addr: *addr,
                             ttl: ttl
                         };
-```
 
-...and push any matches to a list.
-
-```rust
+                        // ...and push any matches to a list.
                         new_authorities.push(rec);
                     }
                 }
             }
         }
-```
 
-If there are any matches, we pick the first one. Again, we'll want to introduce
-randomization later on.
-
-```rust
+        // If there are any matches, we pick the first one.
         if !new_authorities.is_empty() {
             if let DnsRecord::A { addr, .. } = new_authorities[0] {
                 return Some(addr.to_string());
@@ -246,14 +226,11 @@ randomization later on.
 
         None
     } // End of get_resolved_ns
-```
 
-However, not all name servers are as well behaved. In certain cases there won't
-be any A records in the additional section, and we'll have to perform *another*
-lookup in the midst. For this, we introduce a method for returning the host
-name of an appropriate name server.
-
-```rust
+    // However, not all name servers are as that nice. In certain cases there won't
+    // be any A records in the additional section, and we'll have to perform *another*
+    // lookup in the midst. For this, we introduce a method for returning the host
+    // name of an appropriate name server.
     pub fn get_unresolved_ns(&self, qname: &str) -> Option<String> {
 
         let mut new_authorities = Vec::new();
@@ -284,83 +261,56 @@ We move swiftly on to our new `recursive_lookup` function:
 
 ```rust
 fn recursive_lookup(qname: &str, qtype: QueryType) -> Result<DnsPacket> {
-```
 
-For now we're always starting with *a.root-servers.net*.
-
-```rust
+    // For now we're always starting with *a.root-servers.net*.
     let mut ns = "198.41.0.4".to_string();
-```
 
-Since it might take an arbitrary number of steps, we enter an unbounded loop.
-
-```rust
+    // Since it might take an arbitrary number of steps, we enter an unbounded loop.
     loop {
         println!("attempting lookup of {:?} {} with ns {}", qtype, qname, ns);
-```
 
-The next step is to send the query to the active server.
-
-```rust
+        // The next step is to send the query to the active server.
         let ns_copy = ns.clone();
 
         let server = (ns_copy.as_str(), 53);
         let response = try!(lookup(qname, qtype.clone(), server));
-```
 
-If there are entries in the answer section, and no errors, we are done!
-
-```rust
+        // If there are entries in the answer section, and no errors, we are done!
         if !response.answers.is_empty() &&
            response.header.rescode == ResultCode::NOERROR {
 
             return Ok(response.clone());
         }
-```
 
-We might also get a `NXDOMAIN` reply, which is the authoritative name servers
-way of telling us that the name doesn't exist.
-
-```rust
+        // We might also get a `NXDOMAIN` reply, which is the authoritative name servers
+        // way of telling us that the name doesn't exist.
         if response.header.rescode == ResultCode::NXDOMAIN {
             return Ok(response.clone());
         }
-```
 
-Otherwise, we'll try to find a new nameserver based on NS and a corresponding A
-record in the additional section. If this succeeds, we can switch name server
-and retry the loop.
-
-```rust
+        // Otherwise, we'll try to find a new nameserver based on NS and a corresponding A
+        // record in the additional section. If this succeeds, we can switch name server
+        // and retry the loop.
         if let Some(new_ns) = response.get_resolved_ns(qname) {
             ns = new_ns.clone();
 
             continue;
         }
-```
 
-If not, we'll have to resolve the ip of a NS record. If no NS records exist,
-we'll go with what the last server told us.
-
-```rust
+        // If not, we'll have to resolve the ip of a NS record. If no NS records exist,
+        // we'll go with what the last server told us.
         let new_ns_name = match response.get_unresolved_ns(qname) {
             Some(x) => x,
             None => return Ok(response.clone())
         };
-```
 
-Here we go down the rabbit hole by starting _another_ lookup sequence in the
-midst of our current one. Hopefully, this will give us the IP of an appropriate
-name server.
-
-```rust
+        // Here we go down the rabbit hole by starting _another_ lookup sequence in the
+        // midst of our current one. Hopefully, this will give us the IP of an appropriate
+        // name server.
         let recursive_response = try!(recursive_lookup(&new_ns_name, QueryType::A));
-```
 
-Finally, we pick a random ip from the result, and restart the loop. If no such
-record is available, we again return the last result we got.
-
-```rust
+        // Finally, we pick a random ip from the result, and restart the loop. If no such
+        // record is available, we again return the last result we got.
         if let Some(new_ns) = recursive_response.get_random_a() {
             ns = new_ns.clone();
         } else {
@@ -424,4 +374,18 @@ attempting lookup of A www.google.com with ns 216.239.34.10
 Answer: A { domain: "www.google.com", addr: 216.58.211.132, ttl: 300 }
 ```
 
-This mirrors our manual process earlier. We're really getting somewhere!
+This mirrors our manual process earlier. We can now successfully resolve
+a domain starting from the list of root servers. We've now got a fully
+functional, albeit suboptimal, DNS server.
+
+There are many things that we could do better. For instance, there is no true
+concurrency in this server. We can neither send nor receive queries over TCP.
+We cannot use it to host our own zones, and allow it to act as an authorative
+server. The lack of support for DNSSEC leaves us open to DNS poisoning attacks
+where a malicious server can return records relating to somebody else's domain.
+
+Many of these problems have been fixed in my own project
+[hermes](https://github.com/EmilHernvall/hermes), so you can head over there to
+investigate how I did it, or continue on your own from here. Or maybe you've
+had enough of DNS for now... :) Regardless, I hope you've gained some new insight
+into how DNS works.

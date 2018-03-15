@@ -165,13 +165,11 @@ pub fn read(buffer: &mut BytePacketBuffer) -> Result<DnsRecord> {
     let _ = try!(buffer.read_u16());
     let ttl = try!(buffer.read_u32());
     let data_len = try!(buffer.read_u16());
-```
 
-After which we handle each record type separately, starting with the A record
-type which remains the same as before.
-
-```rust
     match qtype {
+
+        // Handle each record type separately, starting with the A record
+        // type which remains the same as before.
         QueryType::A  => {
             let raw_addr = try!(buffer.read_u32());
             let addr = Ipv4Addr::new(((raw_addr >> 24) & 0xFF) as u8,
@@ -185,12 +183,9 @@ type which remains the same as before.
                 ttl: ttl
             })
         },
-```
 
-The AAAA record type follows the same logic, but with more numbers to keep
-track off.
-
-```rust
+        // The AAAA record type follows the same logic, but with more numbers to keep
+        // track off.
         QueryType::AAAA => {
             let raw_addr1 = try!(buffer.read_u32());
             let raw_addr2 = try!(buffer.read_u32());
@@ -211,11 +206,8 @@ track off.
                 ttl: ttl
             })
         },
-```
 
-NS and CNAME both have the same structure.
-
-```rust
+        // NS and CNAME both have the same structure.
         QueryType::NS => {
             let mut ns = String::new();
             try!(buffer.read_qname(&mut ns));
@@ -226,6 +218,7 @@ NS and CNAME both have the same structure.
                 ttl: ttl
             })
         },
+
         QueryType::CNAME => {
             let mut cname = String::new();
             try!(buffer.read_qname(&mut cname));
@@ -236,11 +229,8 @@ NS and CNAME both have the same structure.
                 ttl: ttl
             })
         },
-```
 
-MX is close to the previous two, but with one extra field for priority.
-
-```rust
+        // MX is almost like the previous two, but with one extra field for priority.
         QueryType::MX => {
             let priority = try!(buffer.read_u16());
             let mut mx = String::new();
@@ -253,11 +243,8 @@ MX is close to the previous two, but with one extra field for priority.
                 ttl: ttl
             })
         },
-```
 
-And we end with some code for handling unknown record types, as before.
-
-```rust
+        // And we end with some code for handling unknown record types, as before.
         QueryType::UNKNOWN(_) => {
             try!(buffer.step(data_len as usize));
 
@@ -272,8 +259,9 @@ And we end with some code for handling unknown record types, as before.
 }
 ```
 
-It's a bit of a mouthful, but individually not much more complex than what we
-had.
+It's a bit of a mouthful, but there are no especially complicated records in
+their own right -- it's seeing them all together that makes it look a bit
+unwieldy.
 
 ### Extending BytePacketBuffer for setting values in place
 
@@ -468,5 +456,3 @@ MX {
     ttl: 1794
 }
 ```
-
-Encouraging!

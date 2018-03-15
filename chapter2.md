@@ -216,7 +216,7 @@ impl DnsPacket {
 ### Implementing a stub resolver
 
 We're ready to implement our stub resolver. Rust includes a convenient
-`UDPSocket` which does most of the work. First there's some house keeping:
+`UDPSocket` which does most of the work.
 
 ```rust
 fn main() {
@@ -229,7 +229,6 @@ fn main() {
 
     // Bind a UDP socket to an arbitrary port
     let socket = UdpSocket::bind(("0.0.0.0", 43210)).unwrap();
-
 
     // Build our query packet. It's important that we remember to set the
     // `recursion_desired` flag. As noted earlier, the packet id is arbitrary.
@@ -302,5 +301,3 @@ A {
     ttl: 79
 }
 ```
-
-We're approaching something useful!
