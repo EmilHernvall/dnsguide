@@ -326,3 +326,6 @@ Answer: A { domain: "google.com", addr: 216.58.211.142, ttl: 96 }
 
 Success! In less than 800 lines of code, we've built a DNS server able to respond to
 queries with several different record types!
+
+In the next chapter, we'll get rid of our dependence on an existing resolver:
+[Chapter 5 - Recursive Resolve](/chapter5.md)

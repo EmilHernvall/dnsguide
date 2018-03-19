@@ -456,3 +456,5 @@ MX {
     ttl: 1794
 }
 ```
+
+Next up: [Chapter 4 - Baby's first DNS server](/chapter4.md)
