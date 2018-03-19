@@ -431,7 +431,7 @@ impl BytePacketBuffer {
 
             // If len has the two most significant bit are set, it represents a jump to
             // some other offset in the packet:
-            if (len & 0xC0) > 0 {
+            if (len & 0xC0) == 0xC0 {
                 // Update the buffer position to a point past the current
                 // label. We don't need to touch it any further.
                 if !jumped {

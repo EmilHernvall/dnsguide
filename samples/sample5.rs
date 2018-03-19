@@ -87,7 +87,7 @@ impl BytePacketBuffer {
             // set, represents a offset relative to the start of the buffer. We
             // handle this by jumping to the offset, setting a flag to indicate
             // that we shouldn't update the shared buffer position once done.
-            if (len & 0xC0) > 0 {
+            if (len & 0xC0) == 0xC0 {
 
                 // When a jump is performed, we only modify the shared buffer
                 // position once, and avoid making the change later on.
