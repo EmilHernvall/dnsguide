@@ -9,7 +9,7 @@ Research Institute. This file was synchronized manually through FTP, and as the
 number of hosts grew, so did the rate of change and the unfeasibility of the
 system. In 1983, Paul Mockapetris set out to find a long term solution to the
 problem and went on to design and implement DNS. It's a testament to his
-genius that the his creation has been able to scale from a few thousand
+genius that his creation has been able to scale from a few thousand
 computers to the Internet as we know it today.
 
 With the combined goal of gaining a deep understanding of DNS, of doing
