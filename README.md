@@ -2,7 +2,7 @@ Building a DNS server in Rust
 =============================
 
 The internet has a rich conceptual foundation, with many exciting ideas that
-enables it to function as we know it. One of the really cool ones is DNS. Before
+enable it to function as we know it. One of the really cool ones is DNS. Before
 it was invented, everyone on the internet - which admittedly wasn't that many at
 that stage - relied on a shared file called HOSTS.TXT, maintained by the Stanford
 Research Institute. This file was synchronized manually through FTP, and as the
