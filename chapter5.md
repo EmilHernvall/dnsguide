@@ -2,7 +2,7 @@
 =====================
 
 Our server is working, but being reliant on another server to actually perform
-the lookup is annoying and less than useful. Now is a good time to dwelve into
+the lookup is annoying and less than useful. Now is a good time to delve into
 the details of how a name is really resolved.
 
 Assuming that no information is known since before, the question is first
