@@ -73,7 +73,7 @@ most essential: the A record, mapping a name to an ip.
 | Field      | Type            | Description                                                                       |
 | ---------- | --------------- | --------------------------------------------------------------------------------- |
 | Preamble   | Record Preamble | The record preamble, as described above, with the length field set to 4.          |
-| IP         | 4-byte Integer  | An IP-adress encoded as a four byte integer.                                      |
+| IP         | 4-byte Integer  | An IP-address encoded as a four byte integer.                                      |
 
 Having gotten this far, let's get a feel for this in practice by performing
 a lookup using the `dig` tool:
@@ -107,19 +107,19 @@ There are a few things of note in the output above:
  * The header is using the OPCODE QUERY which corresponds to 0. The status
    (RESCODE) is set to NOERROR, which is 0 numerically. The id is 36383, and
    will change randomly with repeated queries. The Query Response (qr),
-   Recursion Desired (rd), Recursion Available (ra). We can ignore `ad` for
-   now, since it relates to DNSSEC. Finally, the header tells us that there is
-   one question and one answer record.
+   Recursion Desired (rd), Recursion Available (ra) flags are enabled, which are 
+   1 numerically. We can ignore `ad` for now, since it relates to DNSSEC. Finally, 
+   the header tells us that there is one question and one answer record.
  * The question section shows us our question, with the `IN` indicating the
    class, and A telling us that we're performing a query for A records.
  * The answer section contains the answer record, with googles IP. `204` is the
    TTL, IN is again the class, and A is the record type. Finally, we've got the
-   google.com IP-adress.
+   google.com IP-address.
  * The final line tells us that the total packet size was 44 bytes.
 
 There are still some details obscured from view here though, so let's dive
 deeper still and look at a hexdump of the packets. We can use `netcat` to listen
-on a part, and then direct `dig` to send the query there. In one terminal
+on a port, and then direct `dig` to send the query there. In one terminal
 window we run:
 
 ```text
@@ -225,7 +225,7 @@ and class. There's something interesting about the how the name is encoded,
 though -- there are no dots present. Rather DNS encodes each name into
 a sequence of `labels`, with each label prepended by a single byte indicating
 its length. In the example above, "google" is 6 bytes and is thus preceded by
-`0x06`, while "com" is 3 bytes and is preceded by `0x00`. Finally, all names
+`0x06`, while "com" is 3 bytes and is preceded by `0x03`. Finally, all names
 are terminated by a label of zero length, that is a null byte. Seems easy
 enough, doesn't it? Well, as we shall see soon there's another twist to it.
 
@@ -311,7 +311,7 @@ the packet and read from there. Recalling that the length the DNS header
 happens to be 12 bytes, we realize that it's instructing us to start reading
 from where the question part of the packet begins, which makes sense since the
 question starts with the query domain which in this case is "google.com". Once
-we've finished reading the name, we resume parsing where we left of, and move
+we've finished reading the name, we resume parsing where we left off, and move
 on to the record type.
 
 ### BytePacketBuffer
