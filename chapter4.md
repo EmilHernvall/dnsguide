@@ -197,7 +197,7 @@ fn main() {
         // the raw bytes are simply returned, and if not it'll abort by restarting the
         // loop and waiting for the next request. The `recv_from` function will write the
         // data into the provided buffer, and return the length of the data read as well
-        // as the source adress. We're not interested in the length, but we need to keep
+        // as the source address. We're not interested in the length, but we need to keep
         // track of the source in order to send our reply later on.
 
         // Next, `DnsPacket::from_buffer` is used to parse the raw bytes into
