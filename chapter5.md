@@ -15,7 +15,7 @@ logical servers, but in reality many more. You can read more about it
 13 servers before hand. A file containing all of them, in bind format, is
 available and called [named.root](https://www.internic.net/domain/named.root).
 These servers all contain the same information, and to get started we can pick
-one of them at random. Looking at `named.root` we see that the IP-adress of
+one of them at random. Looking at `named.root` we see that the IP-address of
 *a.root-servers.net* is 198.41.0.4, so we'll go ahead and use that to perform
 our initial query for *www.google.com*.
 

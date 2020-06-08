@@ -1,7 +1,7 @@
 2 - Building a stub resolver
 ============================
 
-While it's slightly satisfying to know that we're able to succesfully parse DNS
+While it's slightly satisfying to know that we're able to successfully parse DNS
 packets, it's not much use to just read them off disk. As our next step, we'll
 use it to build a `stub resolver`, which is a DNS client that doesn't feature
 any built-in support for recursive lookup and that will only work with a DNS

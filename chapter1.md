@@ -420,7 +420,7 @@ impl BytePacketBuffer {
         // track whether or not we've jumped
         let mut jumped = false;
 
-        // Our delimeter which we append for each label. Since we don't want a dot at the
+        // Our delimiter which we append for each label. Since we don't want a dot at the
         // beginning of the domain name we'll leave it empty for now and set it to "." at
         // the end of the first iteration.
         let mut delim = "";
