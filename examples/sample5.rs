@@ -164,9 +164,7 @@ impl BytePacketBuffer {
     }
 
     fn write_qname(&mut self, qname: &str) -> Result<()> {
-        let split_str = qname.split('.').collect::<Vec<&str>>();
-
-        for label in split_str {
+        for label in qname.split('.') {
             let len = label.len();
             if len > 0x34 {
                 return Err("Single label exceeds 63 characters of length".into());
@@ -690,84 +688,69 @@ impl DnsPacket {
         Ok(())
     }
 
+    /// It's useful to be able to pick a random A record from a packet. When we
+    /// get multiple IP's for a single name, it doesn't matter which one we
+    /// choose, so in those cases we can now pick one at random.
     pub fn get_random_a(&self) -> Option<String> {
-        if !self.answers.is_empty() {
-            let a_record = &self.answers[0];
-            if let DnsRecord::A { ref addr, .. } = *a_record {
-                return Some(addr.to_string());
-            }
-        }
-
-        None
+        self.answers
+            .iter()
+            .filter_map(|record| match record {
+                DnsRecord::A { ref addr, .. } => Some(addr.to_string()),
+                _ => None,
+            })
+            .next()
     }
 
+    /// A helper function which returns an iterator over all name servers in
+    /// the authorities section, represented as (domain, host) tuples
+    fn get_ns<'a>(&'a self, qname: &'a str) -> impl Iterator<Item = (&'a str, &'a str)> {
+        self.authorities
+            .iter()
+            // In practice, these are always NS records in well formed packages.
+            // Convert the NS records to a tuple which has only the data we need
+            // to make it easy to work with.
+            .filter_map(|record| match record {
+                DnsRecord::NS { domain, host, .. } => Some((domain.as_str(), host.as_str())),
+                _ => None,
+            })
+            // Discard servers which aren't authoritative to our query
+            .filter(move |(domain, _)| qname.ends_with(*domain))
+    }
+
+    /// We'll use the fact that name servers often bundle the corresponding
+    /// A records when replying to an NS query to implement a function that
+    /// returns the actual IP for an NS record if possible.
     pub fn get_resolved_ns(&self, qname: &str) -> Option<String> {
-        let mut new_authorities = Vec::new();
-        for auth in &self.authorities {
-            if let DnsRecord::NS {
-                ref domain,
-                ref host,
-                ..
-            } = *auth
-            {
-                if !qname.ends_with(domain) {
-                    continue;
-                }
-
-                for rsrc in &self.resources {
-                    if let DnsRecord::A {
-                        ref domain,
-                        ref addr,
-                        ttl,
-                    } = *rsrc
-                    {
-                        if domain != host {
-                            continue;
-                        }
-
-                        let rec = DnsRecord::A {
-                            domain: host.clone(),
-                            addr: *addr,
-                            ttl: ttl,
-                        };
-
-                        new_authorities.push(rec);
-                    }
-                }
-            }
-        }
-
-        if !new_authorities.is_empty() {
-            if let DnsRecord::A { addr, .. } = new_authorities[0] {
-                return Some(addr.to_string());
-            }
-        }
-
-        None
+        // Get an iterator over the nameservers in the authorities section
+        self.get_ns(qname)
+            // Now we need to look for a matching A record in the additional
+            // section. Since we just want the first valid record, we can just
+            // build a stream of matching records.
+            .flat_map(|(_, host)| {
+                self.resources
+                    .iter()
+                    // Filter for A records where the domain match the host
+                    // of the NS record that we are currently processing
+                    .filter_map(move |record| match record {
+                        DnsRecord::A { domain, addr, .. } if domain == host => Some(addr),
+                        _ => None,
+                    })
+            })
+            .map(|addr| addr.to_string())
+            // Finally, pick the first valid entry
+            .next()
     }
 
+    /// However, not all name servers are as that nice. In certain cases there won't
+    /// be any A records in the additional section, and we'll have to perform *another*
+    /// lookup in the midst. For this, we introduce a method for returning the host
+    /// name of an appropriate name server.
     pub fn get_unresolved_ns(&self, qname: &str) -> Option<String> {
-        let mut new_authorities = Vec::new();
-        for auth in &self.authorities {
-            if let DnsRecord::NS {
-                ref domain,
-                ref host,
-                ..
-            } = *auth
-            {
-                if !qname.ends_with(domain) {
-                    continue;
-                }
-
-                new_authorities.push(host);
-            }
-        }
-
-        if !new_authorities.is_empty() {
-            return Some(new_authorities[0].clone());
-        }
-
-        None
+        // Get an iterator over the nameservers in the authorities section
+        self.get_ns(qname)
+            .map(|(_, host)| host.to_string())
+            // Finally, pick the first valid entry
+            .next()
     }
 }
 
@@ -794,45 +777,53 @@ fn lookup(qname: &str, qtype: QueryType, server: (&str, u16)) -> Result<DnsPacke
 }
 
 fn recursive_lookup(qname: &str, qtype: QueryType) -> Result<DnsPacket> {
+    // For now we're always starting with *a.root-servers.net*.
     let mut ns = "198.41.0.4".to_string();
 
-    // Start querying name servers
+    // Since it might take an arbitrary number of steps, we enter an unbounded loop.
     loop {
         println!("attempting lookup of {:?} {} with ns {}", qtype, qname, ns);
 
+        // The next step is to send the query to the active server.
         let ns_copy = ns.clone();
 
         let server = (ns_copy.as_str(), 53);
         let response = lookup(qname, qtype.clone(), server)?;
 
-        // If we've got an actual answer, we're done!
+        // If there are entries in the answer section, and no errors, we are done!
         if !response.answers.is_empty() && response.header.rescode == ResultCode::NOERROR {
             return Ok(response.clone());
         }
 
+        // We might also get a `NXDOMAIN` reply, which is the authoritative name servers
+        // way of telling us that the name doesn't exist.
         if response.header.rescode == ResultCode::NXDOMAIN {
             return Ok(response.clone());
         }
 
-        // Otherwise, try to find a new nameserver based on NS and a
-        // corresponding A record in the additional section
+        // Otherwise, we'll try to find a new nameserver based on NS and a corresponding A
+        // record in the additional section. If this succeeds, we can switch name server
+        // and retry the loop.
         if let Some(new_ns) = response.get_resolved_ns(qname) {
-            // If there is such a record, we can retry the loop with that NS
             ns = new_ns.clone();
 
             continue;
         }
 
-        // If not, we'll have to resolve the ip of a NS record
+        // If not, we'll have to resolve the ip of a NS record. If no NS records exist,
+        // we'll go with what the last server told us.
         let new_ns_name = match response.get_unresolved_ns(qname) {
             Some(x) => x,
             None => return Ok(response.clone()),
         };
 
-        // Recursively resolve the NS
+        // Here we go down the rabbit hole by starting _another_ lookup sequence in the
+        // midst of our current one. Hopefully, this will give us the IP of an appropriate
+        // name server.
         let recursive_response = recursive_lookup(&new_ns_name, QueryType::A)?;
 
-        // Pick a random IP and restart
+        // Finally, we pick a random ip from the result, and restart the loop. If no such
+        // record is available, we again return the last result we got.
         if let Some(new_ns) = recursive_response.get_random_a() {
             ns = new_ns.clone();
         } else {

@@ -141,26 +141,27 @@ work, it's a rather quick effort!
 
 We'll start out by doing some quick refactoring, moving our lookup code into
 a separate function. This is for the most part the same code as we had in our
-`main` function in the previous chapter, with the only change being that we
-handle errors gracefully using `try!`.
+`main` function in the previous chapter.
 
 ```rust
 fn lookup(qname: &str, qtype: QueryType, server: (&str, u16)) -> Result<DnsPacket> {
-    let socket = try!(UdpSocket::bind(("0.0.0.0", 43210)));
+    let socket = UdpSocket::bind(("0.0.0.0", 43210))?;
 
     let mut packet = DnsPacket::new();
 
     packet.header.id = 6666;
     packet.header.questions = 1;
     packet.header.recursion_desired = true;
-    packet.questions.push(DnsQuestion::new(qname.to_string(), qtype));
+    packet
+        .questions
+        .push(DnsQuestion::new(qname.to_string(), qtype));
 
     let mut req_buffer = BytePacketBuffer::new();
-    packet.write(&mut req_buffer).unwrap();
-    try!(socket.send_to(&req_buffer.buf[0..req_buffer.pos], server));
+    packet.write(&mut req_buffer)?;
+    socket.send_to(&req_buffer.buf[0..req_buffer.pos], server)?;
 
     let mut res_buffer = BytePacketBuffer::new();
-    socket.recv_from(&mut res_buffer.buf).unwrap();
+    socket.recv_from(&mut res_buffer.buf)?;
 
     DnsPacket::from_buffer(&mut res_buffer)
 }
@@ -171,12 +172,12 @@ fn lookup(qname: &str, qtype: QueryType, server: (&str, u16)) -> Result<DnsPacke
 Now we'll write our server code. First, we need get some things in order.
 
 ```rust
-fn main() {
+fn main() -> Result<()> {
     // Forward queries to Google's public DNS
     let server = ("8.8.8.8", 53);
 
     // Bind an UDP socket on port 2053
-    let socket = UdpSocket::bind(("0.0.0.0", 2053)).unwrap();
+    let socket = UdpSocket::bind(("0.0.0.0", 2053))?;
 
     // For now, queries are handled sequentially, so an infinite loop for servicing
     // requests is initiated.
@@ -224,7 +225,6 @@ fn main() {
         if request.questions.is_empty() {
             packet.header.rescode = ResultCode::FORMERR;
         }
-
         // Usually a question will be present, though.
         else {
             let question = &request.questions[0];
@@ -254,37 +254,36 @@ fn main() {
             } else {
                 packet.header.rescode = ResultCode::SERVFAIL;
             }
-
-            // The only thing remaining is to encode our response and send it off!
-
-            let mut res_buffer = BytePacketBuffer::new();
-            match packet.write(&mut res_buffer) {
-                Ok(_) => {},
-                Err(e) => {
-                    println!("Failed to encode UDP response packet: {:?}", e);
-                    continue;
-                }
-            };
-
-            let len = res_buffer.pos();
-            let data = match res_buffer.get_range(0, len) {
-                Ok(x) => x,
-                Err(e) => {
-                    println!("Failed to retrieve response buffer: {:?}", e);
-                    continue;
-                }
-            };
-
-            match socket.send_to(data, src) {
-                Ok(_) => {},
-                Err(e) => {
-                    println!("Failed to send response buffer: {:?}", e);
-                    continue;
-                }
-            };
         }
-    } // End of request loop
-} // End of main
+
+        // The only thing remaining is to encode our response and send it off!
+        let mut res_buffer = BytePacketBuffer::new();
+        match packet.write(&mut res_buffer) {
+            Ok(_) => {}
+            Err(e) => {
+                println!("Failed to encode UDP response packet: {:?}", e);
+                continue;
+            }
+        };
+
+        let len = res_buffer.pos();
+        let data = match res_buffer.get_range(0, len) {
+            Ok(x) => x,
+            Err(e) => {
+                println!("Failed to retrieve response buffer: {:?}", e);
+                continue;
+            }
+        };
+
+        match socket.send_to(data, src) {
+            Ok(_) => {}
+            Err(e) => {
+                println!("Failed to send response buffer: {:?}", e);
+                continue;
+            }
+        };
+    }
+}
 ```
 
 The match idiom for error handling is used again and again here, since we want to avoid

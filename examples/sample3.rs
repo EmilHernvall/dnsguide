@@ -164,9 +164,7 @@ impl BytePacketBuffer {
     }
 
     fn write_qname(&mut self, qname: &str) -> Result<()> {
-        let split_str = qname.split('.').collect::<Vec<&str>>();
-
-        for label in split_str {
+        for label in qname.split('.') {
             let len = label.len();
             if len > 0x34 {
                 return Err("Single label exceeds 63 characters of length".into());

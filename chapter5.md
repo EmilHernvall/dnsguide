@@ -168,89 +168,68 @@ impl DnsPacket {
 
     - snip -
 
-    // It's useful to be able to pick a random A record from a packet. When we
-    // get multiple IP's for a single name, it doesn't matter which one we
-    // choose, so in those cases we can now pick one at random.
+    /// It's useful to be able to pick a random A record from a packet. When we
+    /// get multiple IP's for a single name, it doesn't matter which one we
+    /// choose, so in those cases we can now pick one at random.
     pub fn get_random_a(&self) -> Option<String> {
-        if !self.answers.is_empty() {
-            let idx = random::<usize>() % self.answers.len();
-            let a_record = &self.answers[idx];
-            if let DnsRecord::A{ ref addr, .. } = *a_record {
-                return Some(addr.to_string());
-            }
-        }
-
-        None
+        self.answers
+            .iter()
+            .filter_map(|record| match record {
+                DnsRecord::A { ref addr, .. } => Some(addr.to_string()),
+                _ => None,
+            })
+            .next()
     }
 
-    // We'll use the fact that name servers often bundle the corresponding
-    // A records when replying to an NS query to implement a function that returns
-    // the actual IP for an NS record if possible.
+    /// A helper function which returns an iterator over all name servers in
+    /// the authorities section, represented as (domain, host) tuples
+    fn get_ns<'a>(&'a self, qname: &'a str) -> impl Iterator<Item=(&'a str, &'a str)> {
+        self.authorities.iter()
+            // In practice, these are always NS records in well formed packages.
+            // Convert the NS records to a tuple which has only the data we need
+            // to make it easy to work with.
+            .filter_map(|record| match record {
+                DnsRecord::NS { domain, host, .. } => Some((domain.as_str(), host.as_str())),
+                _ => None,
+            })
+            // Discard servers which aren't authoritative to our query
+            .filter(move |(domain, _)| qname.ends_with(*domain))
+    }
+
+    /// When there is a NS record in the authorities section, there may also
+    /// be a matching A record in the additional section. This saves us
+    /// from doing a separate query to resolve the IP of the name server.
     pub fn get_resolved_ns(&self, qname: &str) -> Option<String> {
+        // Get an iterator over the nameservers in the authorities section
+        self.get_ns(qname)
+            // Now we need to look for a matching A record in the additional
+            // section. Since we just want the first valid record, we can just
+            // build a stream of matching records.
+            .flat_map(|(_, host)| {
+                self.resources.iter()
+                    // Filter for A records where the domain match the host
+                    // of the NS record that we are currently processing
+                    .filter_map(move |record| match record {
+                        DnsRecord::A { domain, addr, .. } if domain == host => Some(addr),
+                        _ => None,
+                    })
+            })
+            .map(|addr| addr.to_string())
+            // Finally, pick the first valid entry
+            .next()
+    }
 
-        // First, we scan the list of NS records in the authorities section:
-        let mut new_authorities = Vec::new();
-        for auth in &self.authorities {
-            if let DnsRecord::NS { ref domain, ref host, .. } = *auth {
-                if !qname.ends_with(domain) {
-                    continue;
-                }
-
-                // Once we've found an NS record, we scan the resources record for a matching
-                // A record...
-                for rsrc in &self.resources {
-                    if let DnsRecord::A{ ref domain, ref addr, ttl } = *rsrc {
-                        if domain != host {
-                            continue;
-                        }
-
-                        let rec = DnsRecord::A {
-                            domain: host.clone(),
-                            addr: *addr,
-                            ttl: ttl
-                        };
-
-                        // ...and push any matches to a list.
-                        new_authorities.push(rec);
-                    }
-                }
-            }
-        }
-
-        // If there are any matches, we pick the first one.
-        if !new_authorities.is_empty() {
-            if let DnsRecord::A { addr, .. } = new_authorities[0] {
-                return Some(addr.to_string());
-            }
-        }
-
-        None
-    } // End of get_resolved_ns
-
-    // However, not all name servers are as that nice. In certain cases there won't
-    // be any A records in the additional section, and we'll have to perform *another*
-    // lookup in the midst. For this, we introduce a method for returning the host
-    // name of an appropriate name server.
+    /// However, not all name servers are as that nice. In certain cases there won't
+    /// be any A records in the additional section, and we'll have to perform *another*
+    /// lookup in the midst of our first. For this, we introduce a method for
+    returning the hostname of an appropriate name server.
     pub fn get_unresolved_ns(&self, qname: &str) -> Option<String> {
-
-        let mut new_authorities = Vec::new();
-        for auth in &self.authorities {
-            if let DnsRecord::NS { ref domain, ref host, .. } = *auth {
-                if !qname.ends_with(domain) {
-                    continue;
-                }
-
-                new_authorities.push(host);
-            }
-        }
-
-        if !new_authorities.is_empty() {
-            let idx = random::<usize>() % new_authorities.len();
-            return Some(new_authorities[idx].clone());
-        }
-
-        None
-    } // End of get_unresolved_ns
+        // Get an iterator over the nameservers in the authorities section
+        self.get_ns(qname)
+            .map(|(_, host)| host.to_string())
+            // Finally, pick the first valid entry
+            .next()
+    }
 
 } // End of DnsPacket
 ```
@@ -273,12 +252,10 @@ fn recursive_lookup(qname: &str, qtype: QueryType) -> Result<DnsPacket> {
         let ns_copy = ns.clone();
 
         let server = (ns_copy.as_str(), 53);
-        let response = try!(lookup(qname, qtype.clone(), server));
+        let response = lookup(qname, qtype.clone(), server)?;
 
         // If there are entries in the answer section, and no errors, we are done!
-        if !response.answers.is_empty() &&
-           response.header.rescode == ResultCode::NOERROR {
-
+        if !response.answers.is_empty() && response.header.rescode == ResultCode::NOERROR {
             return Ok(response.clone());
         }
 
@@ -301,23 +278,23 @@ fn recursive_lookup(qname: &str, qtype: QueryType) -> Result<DnsPacket> {
         // we'll go with what the last server told us.
         let new_ns_name = match response.get_unresolved_ns(qname) {
             Some(x) => x,
-            None => return Ok(response.clone())
+            None => return Ok(response.clone()),
         };
 
         // Here we go down the rabbit hole by starting _another_ lookup sequence in the
         // midst of our current one. Hopefully, this will give us the IP of an appropriate
         // name server.
-        let recursive_response = try!(recursive_lookup(&new_ns_name, QueryType::A));
+        let recursive_response = recursive_lookup(&new_ns_name, QueryType::A)?;
 
         // Finally, we pick a random ip from the result, and restart the loop. If no such
         // record is available, we again return the last result we got.
         if let Some(new_ns) = recursive_response.get_random_a() {
             ns = new_ns.clone();
         } else {
-            return Ok(response.clone())
+            return Ok(response.clone());
         }
     }
-} // End of recursive_lookup
+}
 ```
 
 ### Trying out recursive lookup
@@ -326,7 +303,7 @@ The only thing remaining is to change our main function to use
 `recursive_lookup`:
 
 ```rust
-fn main() {
+fn main() -> Result<()> {
 
     - snip -
 
