@@ -1,3 +1,8 @@
 *.swp
 target
 tango.stamp
+
+
+#Added by cargo
+
+/target

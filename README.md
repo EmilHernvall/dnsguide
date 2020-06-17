@@ -24,3 +24,18 @@ DNS server, starting from first principles.
  * [Chapter 3 - Adding more Record Types](/chapter3.md)
  * [Chapter 4 - Baby's first DNS server](/chapter4.md)
  * [Chapter 5 - Recursive Resolve](/chapter5.md)
+
+Samples
+-------
+
+Each chapter has a corresponding sample which contains the full code up to
+that point in the guide, named `sample1.rs` through `sample5.rs`. These can be
+run using, for first chapter, `cargo run --example sample1`.
+
+Revision History
+----------------
+
+ * June 2020 - Fixed a security vulnerability in `read_qname` which allowed for
+   a malicious packet to trigger an infinite loop. Modernized the code to
+   conform to current rust pratices.
+ * July 2016 - Initial version
