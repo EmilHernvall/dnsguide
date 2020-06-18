@@ -37,5 +37,5 @@ Revision History
 
  * June 2020 - Fixed a security vulnerability in `read_qname` which allowed for
    a malicious packet to trigger an infinite loop. Modernized the code to
-   conform to current rust pratices.
+   conform to current rust practices, and fixed various ugly inefficiencies.
  * July 2016 - Initial version
