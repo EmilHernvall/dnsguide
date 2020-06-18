@@ -832,84 +832,63 @@ fn recursive_lookup(qname: &str, qtype: QueryType) -> Result<DnsPacket> {
     }
 }
 
+fn handle_query(socket: &UdpSocket) -> Result<()> {
+    let mut req_buffer = BytePacketBuffer::new();
+    let (_, src) = socket.recv_from(&mut req_buffer.buf)?;
+
+    let request = DnsPacket::from_buffer(&mut req_buffer)?;
+
+    let mut packet = DnsPacket::new();
+    packet.header.id = request.header.id;
+    packet.header.recursion_desired = true;
+    packet.header.recursion_available = true;
+    packet.header.response = true;
+
+    if request.questions.is_empty() {
+        packet.header.rescode = ResultCode::FORMERR;
+    } else {
+        let question = &request.questions[0];
+        println!("Received query: {:?}", question);
+
+        if let Ok(result) = recursive_lookup(&question.name, question.qtype) {
+            packet.questions.push(question.clone());
+            packet.header.rescode = result.header.rescode;
+
+            for rec in result.answers {
+                println!("Answer: {:?}", rec);
+                packet.answers.push(rec);
+            }
+            for rec in result.authorities {
+                println!("Authority: {:?}", rec);
+                packet.authorities.push(rec);
+            }
+            for rec in result.resources {
+                println!("Resource: {:?}", rec);
+                packet.resources.push(rec);
+            }
+        } else {
+            packet.header.rescode = ResultCode::SERVFAIL;
+        }
+    }
+
+    let mut res_buffer = BytePacketBuffer::new();
+    packet.write(&mut res_buffer)?;
+
+    let len = res_buffer.pos();
+    let data = res_buffer.get_range(0, len)?;
+
+    socket.send_to(data, src)?;
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let socket = UdpSocket::bind(("0.0.0.0", 2053))?;
 
     loop {
-        let mut req_buffer = BytePacketBuffer::new();
-        let (_, src) = match socket.recv_from(&mut req_buffer.buf) {
-            Ok(x) => x,
-            Err(e) => {
-                println!("Failed to read from UDP socket: {:?}", e);
-                continue;
-            }
-        };
-
-        let request = match DnsPacket::from_buffer(&mut req_buffer) {
-            Ok(x) => x,
-            Err(e) => {
-                println!("Failed to parse UDP query packet: {:?}", e);
-                continue;
-            }
-        };
-
-        let mut packet = DnsPacket::new();
-        packet.header.id = request.header.id;
-        packet.header.recursion_desired = true;
-        packet.header.recursion_available = true;
-        packet.header.response = true;
-
-        if request.questions.is_empty() {
-            packet.header.rescode = ResultCode::FORMERR;
-        } else {
-            let question = &request.questions[0];
-            println!("Received query: {:?}", question);
-
-            if let Ok(result) = recursive_lookup(&question.name, question.qtype) {
-                packet.questions.push(question.clone());
-                packet.header.rescode = result.header.rescode;
-
-                for rec in result.answers {
-                    println!("Answer: {:?}", rec);
-                    packet.answers.push(rec);
-                }
-                for rec in result.authorities {
-                    println!("Authority: {:?}", rec);
-                    packet.authorities.push(rec);
-                }
-                for rec in result.resources {
-                    println!("Resource: {:?}", rec);
-                    packet.resources.push(rec);
-                }
-            } else {
-                packet.header.rescode = ResultCode::SERVFAIL;
-            }
+        match handle_query(&socket) {
+            Ok(_) => {},
+            Err(e) => eprintln!("An error occured: {}", e),
         }
-
-        let mut res_buffer = BytePacketBuffer::new();
-        match packet.write(&mut res_buffer) {
-            Ok(_) => {}
-            Err(e) => {
-                println!("Failed to encode UDP response packet: {:?}", e);
-                continue;
-            }
-        };
-
-        let len = res_buffer.pos();
-        let data = match res_buffer.get_range(0, len) {
-            Ok(x) => x,
-            Err(e) => {
-                println!("Failed to retrieve response buffer: {:?}", e);
-                continue;
-            }
-        };
-
-        match socket.send_to(data, src) {
-            Ok(_) => {}
-            Err(e) => {
-                println!("Failed to send response buffer: {:?}", e);
-                continue;
-            }
-        };
     }
 }

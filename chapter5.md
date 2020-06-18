@@ -222,7 +222,7 @@ impl DnsPacket {
     /// However, not all name servers are as that nice. In certain cases there won't
     /// be any A records in the additional section, and we'll have to perform *another*
     /// lookup in the midst of our first. For this, we introduce a method for
-    returning the hostname of an appropriate name server.
+    /// returning the hostname of an appropriate name server.
     pub fn get_unresolved_ns(&self, qname: &str) -> Option<String> {
         // Get an iterator over the nameservers in the authorities section
         self.get_ns(qname)
@@ -299,11 +299,11 @@ fn recursive_lookup(qname: &str, qtype: QueryType) -> Result<DnsPacket> {
 
 ### Trying out recursive lookup
 
-The only thing remaining is to change our main function to use
+The only thing remaining is to change our `handle_query` function to use
 `recursive_lookup`:
 
 ```rust
-fn main() -> Result<()> {
+fn handle_query(socket: &UdpSocket) -> Result<()> {
 
     - snip -
 
