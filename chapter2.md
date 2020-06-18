@@ -97,7 +97,7 @@ impl DnsHeader {
         )?;
 
         buffer.write_u8(
-            (self.rescode.clone() as u8)
+            (self.rescode as u8)
                 | ((self.checking_disabled as u8) << 4)
                 | ((self.authed_data as u8) << 5)
                 | ((self.z as u8) << 6)

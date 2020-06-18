@@ -303,7 +303,7 @@ impl DnsHeader {
         )?;
 
         buffer.write_u8(
-            (self.rescode.clone() as u8)
+            (self.rescode as u8)
                 | ((self.checking_disabled as u8) << 4)
                 | ((self.authed_data as u8) << 5)
                 | ((self.z as u8) << 6)
@@ -643,7 +643,7 @@ impl DnsPacket {
         result.header.read(buffer)?;
 
         for _ in 0..result.header.questions {
-            let mut question = DnsQuestion::new("".to_string(), QueryType::UNKNOWN(0));
+            let mut question = DnsQuestion::new(String::new(), QueryType::UNKNOWN(0));
             question.read(buffer)?;
             result.questions.push(question);
         }
@@ -728,7 +728,7 @@ fn handle_query(socket: &UdpSocket) -> Result<()> {
 
     // Next, `DnsPacket::from_buffer` is used to parse the raw bytes into
     // a `DnsPacket`.
-    let request = DnsPacket::from_buffer(&mut req_buffer)?;
+    let mut request = DnsPacket::from_buffer(&mut req_buffer)?;
 
     // Create and initialize the response packet
     let mut packet = DnsPacket::new();
@@ -737,15 +737,8 @@ fn handle_query(socket: &UdpSocket) -> Result<()> {
     packet.header.recursion_available = true;
     packet.header.response = true;
 
-    // Being mindful of how unreliable input data from arbitrary senders can be, we
-    // need make sure that a question is actually present. If not, we return `FORMERR`
-    // to indicate that the sender made something wrong.
-    if request.questions.is_empty() {
-        packet.header.rescode = ResultCode::FORMERR;
-    }
-    // Usually a question will be present, though.
-    else {
-        let question = &request.questions[0];
+    // In the normal case, exactly one question is present
+    if let Some(question) = request.questions.pop() {
         println!("Received query: {:?}", question);
 
         // Since all is set up and as expected, the query can be forwarded to the
@@ -754,7 +747,7 @@ fn handle_query(socket: &UdpSocket) -> Result<()> {
         // as much to the client. If rather everything goes as planned, the
         // question and response records as copied into our response packet.
         if let Ok(result) = lookup(&question.name, question.qtype) {
-            packet.questions.push(question.clone());
+            packet.questions.push(question);
             packet.header.rescode = result.header.rescode;
 
             for rec in result.answers {
@@ -772,6 +765,12 @@ fn handle_query(socket: &UdpSocket) -> Result<()> {
         } else {
             packet.header.rescode = ResultCode::SERVFAIL;
         }
+    }
+    // Being mindful of how unreliable input data from arbitrary senders can be, we
+    // need make sure that a question is actually present. If not, we return `FORMERR`
+    // to indicate that the sender made something wrong.
+    else {
+        packet.header.rescode = ResultCode::FORMERR;
     }
 
     // The only thing remaining is to encode our response and send it off!

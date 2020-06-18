@@ -171,11 +171,11 @@ impl DnsPacket {
     /// It's useful to be able to pick a random A record from a packet. When we
     /// get multiple IP's for a single name, it doesn't matter which one we
     /// choose, so in those cases we can now pick one at random.
-    pub fn get_random_a(&self) -> Option<String> {
+    pub fn get_random_a(&self) -> Option<Ipv4Addr> {
         self.answers
             .iter()
             .filter_map(|record| match record {
-                DnsRecord::A { ref addr, .. } => Some(addr.to_string()),
+                DnsRecord::A { addr, .. } => Some(*addr),
                 _ => None,
             })
             .next()
@@ -183,8 +183,9 @@ impl DnsPacket {
 
     /// A helper function which returns an iterator over all name servers in
     /// the authorities section, represented as (domain, host) tuples
-    fn get_ns<'a>(&'a self, qname: &'a str) -> impl Iterator<Item=(&'a str, &'a str)> {
-        self.authorities.iter()
+    fn get_ns<'a>(&'a self, qname: &'a str) -> impl Iterator<Item = (&'a str, &'a str)> {
+        self.authorities
+            .iter()
             // In practice, these are always NS records in well formed packages.
             // Convert the NS records to a tuple which has only the data we need
             // to make it easy to work with.
@@ -196,17 +197,18 @@ impl DnsPacket {
             .filter(move |(domain, _)| qname.ends_with(*domain))
     }
 
-    /// When there is a NS record in the authorities section, there may also
-    /// be a matching A record in the additional section. This saves us
-    /// from doing a separate query to resolve the IP of the name server.
-    pub fn get_resolved_ns(&self, qname: &str) -> Option<String> {
+    /// We'll use the fact that name servers often bundle the corresponding
+    /// A records when replying to an NS query to implement a function that
+    /// returns the actual IP for an NS record if possible.
+    pub fn get_resolved_ns(&self, qname: &str) -> Option<Ipv4Addr> {
         // Get an iterator over the nameservers in the authorities section
         self.get_ns(qname)
             // Now we need to look for a matching A record in the additional
             // section. Since we just want the first valid record, we can just
             // build a stream of matching records.
             .flat_map(|(_, host)| {
-                self.resources.iter()
+                self.resources
+                    .iter()
                     // Filter for A records where the domain match the host
                     // of the NS record that we are currently processing
                     .filter_map(move |record| match record {
@@ -214,19 +216,19 @@ impl DnsPacket {
                         _ => None,
                     })
             })
-            .map(|addr| addr.to_string())
+            .map(|addr| *addr)
             // Finally, pick the first valid entry
             .next()
     }
 
     /// However, not all name servers are as that nice. In certain cases there won't
     /// be any A records in the additional section, and we'll have to perform *another*
-    /// lookup in the midst of our first. For this, we introduce a method for
-    /// returning the hostname of an appropriate name server.
-    pub fn get_unresolved_ns(&self, qname: &str) -> Option<String> {
+    /// lookup in the midst. For this, we introduce a method for returning the host
+    /// name of an appropriate name server.
+    pub fn get_unresolved_ns<'a>(&'a self, qname: &'a str) -> Option<&'a str> {
         // Get an iterator over the nameservers in the authorities section
         self.get_ns(qname)
-            .map(|(_, host)| host.to_string())
+            .map(|(_, host)| host)
             // Finally, pick the first valid entry
             .next()
     }
@@ -240,36 +242,35 @@ We move swiftly on to our new `recursive_lookup` function:
 
 ```rust
 fn recursive_lookup(qname: &str, qtype: QueryType) -> Result<DnsPacket> {
-
     // For now we're always starting with *a.root-servers.net*.
-    let mut ns = "198.41.0.4".to_string();
+    let mut ns = "198.41.0.4".parse::<Ipv4Addr>().unwrap();
 
     // Since it might take an arbitrary number of steps, we enter an unbounded loop.
     loop {
         println!("attempting lookup of {:?} {} with ns {}", qtype, qname, ns);
 
         // The next step is to send the query to the active server.
-        let ns_copy = ns.clone();
+        let ns_copy = ns;
 
-        let server = (ns_copy.as_str(), 53);
-        let response = lookup(qname, qtype.clone(), server)?;
+        let server = (ns_copy, 53);
+        let response = lookup(qname, qtype, server)?;
 
         // If there are entries in the answer section, and no errors, we are done!
         if !response.answers.is_empty() && response.header.rescode == ResultCode::NOERROR {
-            return Ok(response.clone());
+            return Ok(response);
         }
 
         // We might also get a `NXDOMAIN` reply, which is the authoritative name servers
         // way of telling us that the name doesn't exist.
         if response.header.rescode == ResultCode::NXDOMAIN {
-            return Ok(response.clone());
+            return Ok(response);
         }
 
         // Otherwise, we'll try to find a new nameserver based on NS and a corresponding A
         // record in the additional section. If this succeeds, we can switch name server
         // and retry the loop.
         if let Some(new_ns) = response.get_resolved_ns(qname) {
-            ns = new_ns.clone();
+            ns = new_ns;
 
             continue;
         }
@@ -278,7 +279,7 @@ fn recursive_lookup(qname: &str, qtype: QueryType) -> Result<DnsPacket> {
         // we'll go with what the last server told us.
         let new_ns_name = match response.get_unresolved_ns(qname) {
             Some(x) => x,
-            None => return Ok(response.clone()),
+            None => return Ok(response),
         };
 
         // Here we go down the rabbit hole by starting _another_ lookup sequence in the
@@ -289,12 +290,20 @@ fn recursive_lookup(qname: &str, qtype: QueryType) -> Result<DnsPacket> {
         // Finally, we pick a random ip from the result, and restart the loop. If no such
         // record is available, we again return the last result we got.
         if let Some(new_ns) = recursive_response.get_random_a() {
-            ns = new_ns.clone();
+            ns = new_ns;
         } else {
-            return Ok(response.clone());
+            return Ok(response);
         }
     }
 }
+```
+
+This also requires a small change to the `lookup` function, as we need to
+pass which server to use. We add a server parameter to the function signature,
+and remove the hardcoded `server` variable we used in chapter 4:
+
+```rust
+fn lookup(qname: &str, qtype: QueryType, server: (Ipv4Addr, u16)) -> Result<DnsPacket> {
 ```
 
 ### Trying out recursive lookup
