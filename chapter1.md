@@ -139,7 +139,7 @@ Then in another window, do:
 
 The failure is expected in this case, since `dig` will timeout when it doesn't
 receive a response. Since this fails, it exits. At this point `netcat` can be
-exited using Ctrl+C. We're left with a query packet in `packet.txt`. We can use our
+exited using Ctrl+C. We're left with a query packet in `query_packet.txt`. We can use our
 query packet to record a response packet as well:
 
 ```text
