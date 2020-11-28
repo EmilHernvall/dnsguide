@@ -336,10 +336,7 @@ pub struct DnsQuestion {
 
 impl DnsQuestion {
     pub fn new(name: String, qtype: QueryType) -> DnsQuestion {
-        DnsQuestion {
-            name,
-            qtype,
-        }
+        DnsQuestion { name, qtype }
     }
 
     pub fn read(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
@@ -398,11 +395,7 @@ impl DnsRecord {
                     ((raw_addr >> 0) & 0xFF) as u8,
                 );
 
-                Ok(DnsRecord::A {
-                    domain,
-                    addr,
-                    ttl,
-                })
+                Ok(DnsRecord::A { domain, addr, ttl })
             }
             QueryType::UNKNOWN(_) => {
                 buffer.step(data_len as usize)?;

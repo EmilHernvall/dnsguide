@@ -361,10 +361,7 @@ pub struct DnsQuestion {
 
 impl DnsQuestion {
     pub fn new(name: String, qtype: QueryType) -> DnsQuestion {
-        DnsQuestion {
-            name,
-            qtype,
-        }
+        DnsQuestion { name, qtype }
     }
 
     pub fn read(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
@@ -444,11 +441,7 @@ impl DnsRecord {
                     ((raw_addr >> 0) & 0xFF) as u8,
                 );
 
-                Ok(DnsRecord::A {
-                    domain,
-                    addr,
-                    ttl,
-                })
+                Ok(DnsRecord::A { domain, addr, ttl })
             }
             QueryType::AAAA => {
                 let raw_addr1 = buffer.read_u32()?;
@@ -466,11 +459,7 @@ impl DnsRecord {
                     ((raw_addr4 >> 0) & 0xFFFF) as u16,
                 );
 
-                Ok(DnsRecord::AAAA {
-                    domain,
-                    addr,
-                    ttl,
-                })
+                Ok(DnsRecord::AAAA { domain, addr, ttl })
             }
             QueryType::NS => {
                 let mut ns = String::new();
@@ -793,7 +782,7 @@ fn main() -> Result<()> {
     // requests is initiated.
     loop {
         match handle_query(&socket) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => eprintln!("An error occurred: {}", e),
         }
     }
