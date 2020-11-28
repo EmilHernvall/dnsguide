@@ -361,10 +361,7 @@ pub struct DnsQuestion {
 
 impl DnsQuestion {
     pub fn new(name: String, qtype: QueryType) -> DnsQuestion {
-        DnsQuestion {
-            name: name,
-            qtype: qtype,
-        }
+        DnsQuestion { name, qtype }
     }
 
     pub fn read(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
@@ -444,11 +441,7 @@ impl DnsRecord {
                     ((raw_addr >> 0) & 0xFF) as u8,
                 );
 
-                Ok(DnsRecord::A {
-                    domain: domain,
-                    addr: addr,
-                    ttl: ttl,
-                })
+                Ok(DnsRecord::A { domain, addr, ttl })
             }
             QueryType::AAAA => {
                 let raw_addr1 = buffer.read_u32()?;
@@ -466,20 +459,16 @@ impl DnsRecord {
                     ((raw_addr4 >> 0) & 0xFFFF) as u16,
                 );
 
-                Ok(DnsRecord::AAAA {
-                    domain: domain,
-                    addr: addr,
-                    ttl: ttl,
-                })
+                Ok(DnsRecord::AAAA { domain, addr, ttl })
             }
             QueryType::NS => {
                 let mut ns = String::new();
                 buffer.read_qname(&mut ns)?;
 
                 Ok(DnsRecord::NS {
-                    domain: domain,
+                    domain,
                     host: ns,
-                    ttl: ttl,
+                    ttl,
                 })
             }
             QueryType::CNAME => {
@@ -487,9 +476,9 @@ impl DnsRecord {
                 buffer.read_qname(&mut cname)?;
 
                 Ok(DnsRecord::CNAME {
-                    domain: domain,
+                    domain,
                     host: cname,
-                    ttl: ttl,
+                    ttl,
                 })
             }
             QueryType::MX => {
@@ -498,20 +487,20 @@ impl DnsRecord {
                 buffer.read_qname(&mut mx)?;
 
                 Ok(DnsRecord::MX {
-                    domain: domain,
-                    priority: priority,
+                    domain,
+                    priority,
                     host: mx,
-                    ttl: ttl,
+                    ttl,
                 })
             }
             QueryType::UNKNOWN(_) => {
                 buffer.step(data_len as usize)?;
 
                 Ok(DnsRecord::UNKNOWN {
-                    domain: domain,
+                    domain,
                     qtype: qtype_num,
-                    data_len: data_len,
-                    ttl: ttl,
+                    data_len,
+                    ttl,
                 })
             }
         }
@@ -793,8 +782,8 @@ fn main() -> Result<()> {
     // requests is initiated.
     loop {
         match handle_query(&socket) {
-            Ok(_) => {},
-            Err(e) => eprintln!("An error occured: {}", e),
+            Ok(_) => {}
+            Err(e) => eprintln!("An error occurred: {}", e),
         }
     }
 }
