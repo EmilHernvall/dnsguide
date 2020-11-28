@@ -256,7 +256,7 @@ fn main() -> Result<()> {
     loop {
         match handle_query(&socket) {
             Ok(_) => {},
-            Err(e) => eprintln!("An error occured: {}", e),
+            Err(e) => eprintln!("An error occurred: {}", e),
         }
     }
 }
