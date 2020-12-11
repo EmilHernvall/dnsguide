@@ -112,7 +112,7 @@ There are a few things of note in the output above:
    the header tells us that there is one question and one answer record.
  * The question section shows us our question, with the `IN` indicating the
    class, and A telling us that we're performing a query for A records.
- * The answer section contains the answer record, with googles IP. `204` is the
+ * The answer section contains the answer record, with google's IP. `204` is the
    TTL, IN is again the class, and A is the record type. Finally, we've got the
    google.com IP-address.
  * The final line tells us that the total packet size was 44 bytes.
