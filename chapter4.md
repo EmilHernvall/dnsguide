@@ -271,7 +271,7 @@ All done! Let's try it! We start our server in one terminal, and use `dig` to
 perform a lookup in a second terminal.
 
 ```text
-# dig @127.0.0.1 -p 2053 google.com
+# dig +noedns @127.0.0.1 -p 2053 google.com
 
 ; <<>> DiG 9.10.3-P4-Ubuntu <<>> @127.0.0.1 -p 2053 google.com
 ; (1 server found)
