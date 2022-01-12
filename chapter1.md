@@ -123,7 +123,7 @@ on a port, and then direct `dig` to send the query there. In one terminal
 window we run:
 
 ```text
-# nc -u -l 1053 > query_packet.txt
+# nc -u -l -p 1053 > query_packet.txt
 ```
 
 Then in another window, do:
