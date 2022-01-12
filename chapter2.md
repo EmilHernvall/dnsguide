@@ -55,7 +55,7 @@ We'll also need a function for writing query names in labeled form:
 
 ```rust
     fn write_qname(&mut self, qname: &str) -> Result<()> {
-        for label in qname.split('.') {
+        for label in qname.split('.').filter(|s| s.len() > 0) {
             let len = label.len();
             if len > 0x3f {
                 return Err("Single label exceeds 63 characters of length".into());
