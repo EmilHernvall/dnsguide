@@ -205,7 +205,7 @@ R    P    A C D  A          C
 ```
 
 Since this is a response `QR` is set, and so is `RA` to indicate that the
-server do support recursion. Looking at the remaining eight bytes of the reply,
+server does support recursion. Looking at the remaining eight bytes of the reply,
 we see that in addition to having a single question, we've also got a single
 answer record.
 
