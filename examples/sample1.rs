@@ -138,31 +138,30 @@ impl BytePacketBuffer {
 
                 continue;
             }
+
             // The base scenario, where we're reading a single label and
             // appending it to the output:
-            else {
-                // Move a single byte forward to move past the length byte.
-                pos += 1;
+            // Move a single byte forward to move past the length byte.
+            pos += 1;
 
-                // Domain names are terminated by an empty label of length 0,
-                // so if the length is zero we're done.
-                if len == 0 {
-                    break;
-                }
-
-                // Append the delimiter to our output buffer first.
-                outstr.push_str(delim);
-
-                // Extract the actual ASCII bytes for this label and append them
-                // to the output buffer.
-                let str_buffer = self.get_range(pos, len as usize)?;
-                outstr.push_str(&String::from_utf8_lossy(str_buffer).to_lowercase());
-
-                delim = ".";
-
-                // Move forward the full length of the label.
-                pos += len as usize;
+            // Domain names are terminated by an empty label of length 0,
+            // so if the length is zero we're done.
+            if len == 0 {
+                break;
             }
+
+            // Append the delimiter to our output buffer first.
+            outstr.push_str(delim);
+
+            // Extract the actual ASCII bytes for this label and append them
+            // to the output buffer.
+            let str_buffer = self.get_range(pos, len as usize)?;
+            outstr.push_str(&String::from_utf8_lossy(str_buffer).to_lowercase());
+
+            delim = ".";
+
+            // Move forward the full length of the label.
+            pos += len as usize;
         }
 
         if !jumped {
