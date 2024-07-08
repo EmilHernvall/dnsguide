@@ -19,11 +19,11 @@ a truthful chronicle of that journey, but rather an idealized version of it,
 without all the detours I ended up taking. We'll gradually implement a full
 DNS server, starting from first principles.
 
- * [Chapter 1 - The DNS protocol](/chapter1.md)
- * [Chapter 2 - Building a stub resolver](/chapter2.md)
- * [Chapter 3 - Adding more Record Types](/chapter3.md)
- * [Chapter 4 - Baby's first DNS server](/chapter4.md)
- * [Chapter 5 - Recursive Resolve](/chapter5.md)
+ * [Chapter 1 - The DNS protocol](chapter1.md)
+ * [Chapter 2 - Building a stub resolver](chapter2.md)
+ * [Chapter 3 - Adding more Record Types](chapter3.md)
+ * [Chapter 4 - Baby's first DNS server](chapter4.md)
+ * [Chapter 5 - Recursive Resolve](chapter5.md)
 
 Samples
 -------
