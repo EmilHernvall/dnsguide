@@ -20,7 +20,7 @@ packet looks as follows:
 | Header             | 12 Bytes | Header            | Information about the query/response.                                                                  |
 | Question Section   | Variable | List of Questions | In practice only a single question indicating the query name (domain) and the record type of interest. |
 | Answer Section     | Variable | List of Records   | The relevant records of the requested type.                                                            |
-| Authority Section  | Variable | List of Records   | An list of name servers (NS records), used for resolving queries recursively.                          |
+| Authority Section  | Variable | List of Records   | A list of name servers (NS records), used for resolving queries recursively.                          |
 | Additional Section | Variable | List of Records   | Additional records, that might be useful. For instance, the corresponding A records for NS records.    |
 
 Essentially, we have to support three different objects: Header, Question and
@@ -146,7 +146,7 @@ query packet to record a response packet as well:
 # nc -u 8.8.8.8 53 < query_packet.txt > response_packet.txt
 ```
 
-Give it a second, and the cancel using Ctrl+C. We are now ready to inspect our
+Give it a second, and then cancel using Ctrl+C. We are now ready to inspect our
 packets:
 
 ```text
@@ -166,11 +166,11 @@ header is 12 bytes long. For the query packet, the header bytes are:
 `86 2a 01 20 00 01 00 00 00 00 00 00` We can see that the last eight bytes
 corresponds to the length of the different sections, with the only one actually
 having any content being the question section which holds a single entry. The
-more interesting part is the first four bytes, which corresponds to the
-different fields of the header. First off, we know that we've got a 2-byte
+most interesting part are the first four bytes, which corresponds to the
+different fields of the header. First off, we know that we got a 2-byte
 id, which is supposed to stay the same for both query and answer. Indeed we
 see that in this example it's set to `86 2a` in both hexdumps. The hard part
-to parse is the remaining two bytes. In order to make sense of them, we'll have
+to parse are the remaining two bytes. In order to make sense of them, we'll have
 to convert them to binary. Starting with the `01 20` of the query packet, we
 find (with the Most Significant Bit first):
 
@@ -187,7 +187,7 @@ R    P    A C D  A          C
 
 Except for the DNSSEC related bit in the `Z` section, this is as expected. `QR`
 is 0 since its a Query, `OPCODE` is also 0 since it's a standard lookup, the
-`AA`, `TC` and `RA` flags isn't relevant for queries while `RD` is set, since `dig`
+`AA`, `TC` and `RA` flags aren't relevant for queries while `RD` is set, since `dig`
 defaults to requesting recursive lookup. Finally, `RCODE` isn't used for
 queries either.
 
@@ -221,7 +221,7 @@ DEC    6                    3           0       1      1
 ```
 
 As outlined in the table earlier, it consists of three parts: query name, type
-and class. There's something interesting about the how the name is encoded,
+and class. There's something interesting about how the name is encoded,
 though -- there are no dots present. Rather DNS encodes each name into
 a sequence of `labels`, with each label prepended by a single byte indicating
 its length. In the example above, "google" is 6 bytes and is thus preceded by
