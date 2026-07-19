@@ -19,6 +19,12 @@ a truthful chronicle of that journey, but rather an idealized version of it,
 without all the detours I ended up taking. We'll gradually implement a full
 DNS server, starting from first principles.
 
+The English files in the repository root remain the source of truth. For the
+Turkish working tree, start here: [tr/README.md](tr/README.md).
+
+The Turkish tree follows the same chapter order, and the translated examples
+live under [tr/examples/](tr/examples/).
+
  * [Chapter 1 - The DNS protocol](chapter1.md)
  * [Chapter 2 - Building a stub resolver](chapter2.md)
  * [Chapter 3 - Adding more Record Types](chapter3.md)
@@ -29,8 +35,12 @@ Samples
 -------
 
 Each chapter has a corresponding sample which contains the full code up to
-that point in the guide, named `sample1.rs` through `sample5.rs`. These can be
-run using, for first chapter, `cargo run --example sample1`.
+that point in the guide, named `sample1.rs` through `sample5.rs`.
+
+The English examples stay in [examples/](examples/), and the Turkish copies are
+kept in [tr/examples/](tr/examples/).
+
+To run the first sample, use `cargo run --example sample1`.
 
 Revision History
 ----------------
