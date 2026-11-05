@@ -482,4 +482,4 @@ MX {
 }
 ```
 
-Next up: [Chapter 4 - Baby's first DNS server](/chapter4.md)
+Next up: [Chapter 4 - Baby's first DNS server](chapter4.md)

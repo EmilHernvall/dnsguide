@@ -303,4 +303,4 @@ Success! In less than 800 lines of code, we've built a DNS server able to respon
 queries with several different record types!
 
 In the next chapter, we'll get rid of our dependence on an existing resolver:
-[Chapter 5 - Recursive Resolve](/chapter5.md)
+[Chapter 5 - Recursive Resolve](chapter5.md)

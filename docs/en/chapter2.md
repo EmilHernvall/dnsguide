@@ -308,4 +308,4 @@ A {
 }
 ```
 
-The next chapter covers implementing a richer set of record types: [Chapter 3 - Adding more Record Types](/chapter3.md)
+The next chapter covers implementing a richer set of record types: [Chapter 3 - Adding more Record Types](chapter3.md)
