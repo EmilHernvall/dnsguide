@@ -11,6 +11,7 @@ Languages
 | Language | Guide | Status |
 |----------|-------|--------|
 | English  | [docs/en](docs/en/README.md) | Original |
+| Français | [docs/fr](docs/fr/README.md) | Complete |
 
 Want to add a language? See [TRANSLATING.md](TRANSLATING.md).
 

@@ -1,7 +1,7 @@
 3 - Adding more Record Types
 ============================
 
-Let's use our program to do a lookup for ''yahoo.com''.
+Let's use our program to do a lookup for *www.yahoo.com*.
 
 ```rust
 let qname = "www.yahoo.com";
@@ -406,7 +406,7 @@ our server.
 
 ### Testing the new record types
 
-Now we're ready to retry our ''yahoo.com'' query:
+Now we're ready to retry our *www.yahoo.com* query:
 
 ```text
 DnsHeader {

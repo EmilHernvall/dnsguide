@@ -81,7 +81,7 @@ while the `RD` flag was set in the query, the server didn't set the `RA` flag in
 response. We can still use the same server for *google.com*, however:
 
 ```text
-dig @ns1.google.com google.com                                                                                                                                                                                                                                 <<<
+# dig @ns1.google.com google.com
 
 ; <<>> DiG 9.10.3-P4-Ubuntu <<>> +recurse @ns1.google.com google.com
 ; (1 server found)
