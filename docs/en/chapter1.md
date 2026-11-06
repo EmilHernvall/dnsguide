@@ -851,4 +851,4 @@ A {
 }
 ```
 
-In the next chapter, we'll add network connectivity: [Chapter 2 - Building a stub resolver](/chapter2.md)
+In the next chapter, we'll add network connectivity: [Chapter 2 - Building a stub resolver](chapter2.md)

@@ -1,13 +1,13 @@
-3 - Adding more Record Types
-============================
+3 - Ajouter d'autres types d'enregistrements
+============================================
 
-Let's use our program to do a lookup for ''yahoo.com''.
+Utilisons notre programme pour résoudre *www.yahoo.com*.
 
 ```rust
 let qname = "www.yahoo.com";
 ```
 
-Running it yields:
+L'exécution donne :
 
 ```text
 DnsHeader {
@@ -49,23 +49,24 @@ A {
 }
 ```
 
-That's odd -- we're getting an UNKNOWN record as well as two A records. The
-UNKNOWN record, with query type 5 is a CNAME. There are quite a few DNS record
-types, many of which doesn't see any use in practice. That said, let's have
-a look at a few essential ones:
+Étrange : nous recevons un enregistrement UNKNOWN en plus de deux
+enregistrements A. L'enregistrement UNKNOWN, de type 5, est un CNAME. Il existe
+un bon nombre de types d'enregistrements DNS, dont beaucoup ne sont jamais
+utilisés en pratique. Cela dit, examinons-en quelques-uns qui sont
+essentiels :
 
-| ID  | Name  | Description                                              | Encoding                                         |
-| --- | ----- | -------------------------------------------------------- | ------------------------------------------------ |
-| 1   | A     | Alias - Mapping names to IP addresses                    | Preamble + Four bytes for IPv4 adress            |
-| 2   | NS    | Name Server - The DNS server address for a domain        | Preamble + Label Sequence                        |
-| 5   | CNAME | Canonical Name - Maps names to names                     | Preamble + Label Sequence                        |
-| 15  | MX    | Mail eXchange - The host of the mail server for a domain | Preamble + 2-bytes for priority + Label Sequence |
-| 28  | AAAA  | IPv6 alias                                               | Premable + Sixteen bytes for IPv6 adress         |
+| ID  | Nom   | Description                                                                  | Encodage                                                 |
+| --- | ----- | ---------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 1   | A     | Alias - Associe des noms à des adresses IP                                   | Préambule + quatre octets pour l'adresse IPv4            |
+| 2   | NS    | Serveur de noms (*Name Server*) - L'adresse du serveur DNS d'un domaine      | Préambule + suite de labels                              |
+| 5   | CNAME | Nom canonique (*Canonical Name*) - Associe des noms à d'autres noms          | Préambule + suite de labels                              |
+| 15  | MX    | Échangeur de courrier (*Mail eXchange*) - L'hôte du serveur mail d'un domaine | Préambule + 2 octets pour la priorité + suite de labels |
+| 28  | AAAA  | Alias IPv6                                                                   | Préambule + seize octets pour l'adresse IPv6             |
 
-### Extending QueryType with more record types
+### Étendre QueryType avec de nouveaux types d'enregistrements
 
-Let's go ahead and add them to our code! First we'll update our `QueryType`
-enum:
+Ajoutons-les à notre code ! Commençons par mettre à jour notre enum
+`QueryType` :
 
 ```rust
 #[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
@@ -79,7 +80,7 @@ pub enum QueryType {
 }
 ```
 
-We'll also need to change our utility functions.
+Il faut aussi modifier nos fonctions utilitaires.
 
 ```rust
 impl QueryType {
@@ -107,10 +108,11 @@ impl QueryType {
 }
 ```
 
-### Extending DnsRecord for reading new record types
+### Étendre DnsRecord pour lire les nouveaux types d'enregistrements
 
-Now we need a way of holding the data for these records, so we'll make some
-modifications to `DnsRecord`.
+Il nous faut maintenant un moyen de stocker les données de ces
+enregistrements ; nous allons donc apporter quelques modifications à
+`DnsRecord`.
 
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -151,9 +153,10 @@ pub enum DnsRecord {
 }
 ```
 
-Here comes the bulk of the work. We'll need to extend the functions for writing
-and reading records. Starting with read, we amend it with additional code for
-each record type. First off, we've got the common preamble:
+Voici le gros du travail. Nous devons étendre les fonctions d'écriture et de
+lecture des enregistrements. En commençant par la lecture, nous la complétons
+avec du code supplémentaire pour chaque type d'enregistrement. Tout d'abord, il
+y a le préambule commun :
 
 ```rust
 impl DnsRecord {
@@ -254,14 +257,14 @@ impl DnsRecord {
 }
 ```
 
-It's a bit of a mouthful, but there are no especially complicated records in
-their own right -- it's seeing them all together that makes it look a bit
-unwieldy.
+C'est un peu indigeste, mais aucun enregistrement n'est particulièrement
+compliqué en lui-même : c'est de les voir tous ensemble qui donne cette
+impression de lourdeur.
 
-### Extending BytePacketBuffer for setting values in place
+### Étendre BytePacketBuffer pour modifier des valeurs sur place
 
-Before we move on to writing records, we'll have to add two more functions to
-`BytePacketBuffer`:
+Avant de passer à l'écriture des enregistrements, nous devons ajouter deux
+fonctions supplémentaires à `BytePacketBuffer` :
 
 ```rust
 impl BytePacketBuffer {
@@ -284,14 +287,15 @@ impl BytePacketBuffer {
 }
 ```
 
-When writing the labels of a record, we don't know ahead of time the number of
-bytes needed, since we might end up using jumps to compress the size. We'll
-solve this by writing a zero size and then going back to fill in the size
-needed.
+Lorsque nous écrivons les labels d'un enregistrement, nous ne connaissons pas
+à l'avance le nombre d'octets nécessaires, puisque nous pourrions utiliser des
+sauts pour réduire la taille. Nous résolvons ce problème en écrivant d'abord
+une taille nulle, puis en revenant en arrière pour y inscrire la taille réelle.
 
-### Extending DnsRecord for writing new record types
+### Étendre DnsRecord pour écrire les nouveaux types d'enregistrements
 
-Now we can amend `DnsRecord::write`. Here's our new function:
+Nous pouvons maintenant compléter `DnsRecord::write`. Voici notre nouvelle
+fonction :
 
 ```rust
 impl DnsRecord {
@@ -400,13 +404,13 @@ impl DnsRecord {
 }
 ```
 
-Again, quite a bit of extra code, but thankfully the last thing we've got to
-do. We're still not using the write part, but it'll come in handy once we write
-our server.
+Encore une bonne quantité de code supplémentaire, mais c'est heureusement la
+dernière chose à faire. Nous n'utilisons toujours pas la partie écriture, mais
+elle nous sera utile lorsque nous écrirons notre serveur.
 
-### Testing the new record types
+### Tester les nouveaux types d'enregistrements
 
-Now we're ready to retry our ''yahoo.com'' query:
+Nous sommes prêts à relancer notre requête pour *www.yahoo.com* :
 
 ```text
 DnsHeader {
@@ -447,14 +451,14 @@ A {
 }
 ```
 
-For good measure, let's try doing an MX lookup as well:
+Pour faire bonne mesure, essayons aussi une requête MX :
 
 ```rust
 let qname = "yahoo.com";
 let qtype = QueryType::MX;
 ```
 
-Which yields:
+Ce qui donne :
 
 ```text
 - snip -
@@ -482,4 +486,4 @@ MX {
 }
 ```
 
-Next up: [Chapter 4 - Baby's first DNS server](/chapter4.md)
+Prochaine étape : [Chapitre 4 - Notre tout premier serveur DNS](chapter4.md)
